@@ -4,6 +4,7 @@ const path = require("path");
 const config = require("../config.json");
 const handler = require("./handler");
 const logger = require("./utils/logger");
+const state = require("./state");
 
 // ===== تحميل الكوكيز =====
 const appstatePath = path.join(__dirname, "../appstate.json");
@@ -33,7 +34,6 @@ login({ appState: appstate }, async (err, api) => {
   // حفظ الكوكيز المحدّثة
   fs.writeFileSync(appstatePath, JSON.stringify(api.getAppState(), null, 2));
 
-  // إعدادات API
   api.setOptions({
     listenEvents: config.listenEvents,
     selfListen: false,
@@ -42,31 +42,67 @@ login({ appState: appstate }, async (err, api) => {
 
   const botID = api.getCurrentUserID();
   logger.info(`✅ تسجيل الدخول نجح | ID: ${botID}`);
-  logger.info(`🤖 البوت يعمل | البادئة: ${config.prefix}`);
+  logger.info(`🤖 ${config.botName} يعمل | البادئة: ${config.prefix}`);
 
-  // ===== الاستماع للرسائل =====
+  // ===== الاستماع للرسائل والأحداث =====
   api.listenMqtt((err, event) => {
     if (err) {
-      logger.error("خطأ في الاستماع: " + err);
+      logger.error("خطأ في الاستماع: " + JSON.stringify(err));
       return;
     }
 
-    // نتجاهل رسائل البوت نفسه
+    if (!event) return;
+
+    // تجاهل رسائل البوت نفسه
     if (event.senderID === botID) return;
 
-    // معالجة الرسائل النصية فقط
+    // ===== رسائل نصية =====
     if (event.type === "message" || event.type === "message_reply") {
       handler.handleMessage(api, event, config, botID);
     }
 
-    // معالجة أحداث أخرى (انضمام، مغادرة...)
+    // ===== أحداث القروب (للحماية) =====
     if (event.type === "event") {
-      handler.handleEvent(api, event, config, botID);
+      handleGroupEvent(api, event);
     }
   });
+
+  // ===== معالج أحداث القروب =====
+  function handleGroupEvent(api, event) {
+    const { threadID, logMessageType } = event;
+    const protection = state.protectionState.get(threadID);
+    if (!protection || !protection.active) return;
+
+    // حماية اسم القروب
+    if (logMessageType === "log:thread-name") {
+      const newName = event.logMessageData && event.logMessageData.name;
+      if (newName && newName !== protection.name) {
+        setTimeout(() => {
+          api.setTitle(protection.name, threadID, (err) => {
+            if (!err)
+              logger.info(`🛡 أعدت اسم القروب في ${threadID} إلى: ${protection.name}`);
+          });
+        }, 1000);
+      }
+    }
+
+    // حماية الكنيات
+    if (logMessageType === "log:user-nickname") {
+      const changedUID =
+        event.logMessageData && event.logMessageData.participant_id;
+      if (changedUID && protection.nicknames && protection.nicknames.has(changedUID)) {
+        const savedNick = protection.nicknames.get(changedUID);
+        setTimeout(() => {
+          api.changeNickname(savedNick, threadID, changedUID, (err) => {
+            if (!err)
+              logger.info(`🛡 أعدت كنية ${changedUID} في ${threadID} إلى: ${savedNick}`);
+          });
+        }, 1000);
+      }
+    }
+  }
 });
 
-// معالجة الأخطاء غير المتوقعة
 process.on("uncaughtException", (err) => {
   logger.error("خطأ غير متوقع: " + err.message);
 });

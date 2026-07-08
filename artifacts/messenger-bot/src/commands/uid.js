@@ -10,15 +10,9 @@ module.exports = {
 
   async run({ api, event, messageReply }) {
     const { threadID, senderID } = event;
-
     if (messageReply) {
-      const targetID = messageReply.senderID;
-      return api.sendMessage(
-        `🆔 ID المُشار إليه: ${targetID}`,
-        threadID
-      );
+      return api.sendMessage(`🆔 ID المُشار إليه: ${messageReply.senderID}`, threadID);
     }
-
     api.sendMessage(`🆔 ID الخاص بك: ${senderID}`, threadID);
   },
 };
