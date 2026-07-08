@@ -1,0 +1,16 @@
+{
+  "name": "@workspace/messenger-bot",
+  "version": "1.0.0",
+  "description": "بوت فيسبوك مسنجر عربي",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node src/index.js"
+  },
+  "dependencies": {
+    "ws3-fca": "latest",
+    "chalk": "^4.1.2",
+    "dotenv": "^16.0.3"
+  }
+}

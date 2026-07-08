@@ -1,0 +1,11 @@
+{
+  "prefix": "!",
+  "botName": "بوتي",
+  "language": "ar",
+  "adminUIDs": [],
+  "cooldown": 3,
+  "autoReact": true,
+  "autoReactEmoji": "👍",
+  "logLevel": "info",
+  "listenEvents": true
+}
