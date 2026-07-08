@@ -6,7 +6,7 @@ module.exports = {
   config: {
     name: "صورة",
     aliases: ["image", "img", "pic"],
-    description: "يبحث ويرسل 4 صور لأي شيء تطلبه",
+    description: "يبحث ويرسل صور لأي شيء تطلبه",
     usage: "!صورة [الموضوع]",
     cooldown: 10,
     adminOnly: false,
@@ -23,21 +23,24 @@ module.exports = {
     api.sendMessage(`🔍 جاري البحث عن صور "${query}"...`, threadID);
 
     try {
-      const urls = await searchImages(query, 4);
+      const urls = await searchImages(query, 6);
 
       if (!urls.length) {
         return api.sendMessage(`❌ لم أجد صوراً لـ "${query}". حاول بكلمة مختلفة.`, threadID);
       }
 
-      // تحميل الصور بشكل متوازٍ
-      const tmpPaths = await Promise.all(urls.map((u) => downloadImage(u)));
-      const validPaths = tmpPaths.filter(Boolean);
+      // تحميل الصور بشكل متسلسل حتى نحصل على 4 صور صالحة
+      const validPaths = [];
+      for (const url of urls) {
+        if (validPaths.length >= 4) break;
+        const p = await downloadImage(url);
+        if (p) validPaths.push(p);
+      }
 
       if (!validPaths.length) {
         return api.sendMessage(`❌ فشل تحميل الصور. حاول مرة أخرى.`, threadID);
       }
 
-      // إرسال الصور كمرفقات متعددة
       api.sendMessage(
         {
           body: `🖼️ ${validPaths.length} صور لـ "${query}"`,

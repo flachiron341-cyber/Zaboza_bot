@@ -29,8 +29,26 @@ for (const file of commandFiles) {
 
 logger.info(`✅ إجمالي الأوامر المحملة: ${commandFiles.length}`);
 
+// ===== تطبيع الحدث: تحويل جميع IDs لـ primitive strings =====
+// ws3-fca أحياناً يُعيد IDs كـ String objects وليس primitive strings
+// مما يُسبب خطأ "MessageID should be of type string and not String"
+function normalizeEvent(event) {
+  const e = Object.assign({}, event);
+  if (e.threadID)  e.threadID  = String(e.threadID);
+  if (e.senderID)  e.senderID  = String(e.senderID);
+  if (e.messageID) e.messageID = String(e.messageID);
+  if (e.messageReply) {
+    e.messageReply = Object.assign({}, e.messageReply);
+    if (e.messageReply.messageID) e.messageReply.messageID = String(e.messageReply.messageID);
+    if (e.messageReply.senderID)  e.messageReply.senderID  = String(e.messageReply.senderID);
+    if (e.messageReply.threadID)  e.messageReply.threadID  = String(e.messageReply.threadID);
+  }
+  return e;
+}
+
 // ===== معالج الرسائل الرئيسي =====
-async function handleMessage(api, event, config, botID) {
+async function handleMessage(api, rawEvent, config, botID) {
+  const event = normalizeEvent(rawEvent);
   const { senderID, threadID, body, messageReply } = event;
 
   // ── فحص إجابات الألعاب (رد على رسالة البوت) ──
@@ -89,19 +107,17 @@ async function handleMessage(api, event, config, botID) {
 
 // ===== معالج إجابات الألعاب =====
 async function processGameAnswer(api, event, session, type) {
-  const { senderID, threadID, body } = event;
+  const { threadID, body } = event;
 
-  // إلغاء المؤقت
   if (session.timer) clearTimeout(session.timer);
 
-  // حذف الجلسة
   if (type === "اسئلة") {
     state.gameSessions.delete(session.msgID);
   } else {
     state.mathSessions.delete(session.msgID);
   }
 
-  const userAnswer = body.trim().replace(/\s+/g, "");
+  const userAnswer    = body.trim().replace(/\s+/g, "");
   const correctAnswer = String(session.answer).trim().replace(/\s+/g, "");
 
   const isCorrect =
@@ -112,7 +128,7 @@ async function processGameAnswer(api, event, session, type) {
     api.sendMessage("🎉 أنت عبقري حبي! الإجابة صحيحة 🌟✨", threadID);
   } else {
     api.sendMessage(
-      `❌ ايها القرد الاسود الغبي تعلم نخمك 😢💔\n✅ الإجابة الصحيحة: ${session.answer}`,
+      `❌ إجابة خاطئة 😢💔\n✅ الإجابة الصحيحة: ${session.answer}`,
       threadID
     );
   }

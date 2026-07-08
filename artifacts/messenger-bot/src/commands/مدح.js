@@ -26,16 +26,17 @@ module.exports = {
       return api.sendMessage("❌ ردّ على رسالة الشخص الذي تريد مدحه!", threadID);
     }
 
-    if (messageReply.senderID === senderID) {
+    if (String(messageReply.senderID) === String(senderID)) {
       return api.sendMessage("😂 ما تقدر تمدح نفسك يا حبيب!", threadID);
     }
 
+    const targetID = String(messageReply.senderID);
     const praise = praises[Math.floor(Math.random() * praises.length)];
 
-    api.getUserInfo(messageReply.senderID, (err, data) => {
+    api.getUserInfo(targetID, (err, data) => {
       let name = "صديقنا";
-      if (!err && data && data[messageReply.senderID]) {
-        name = data[messageReply.senderID].name || name;
+      if (!err && data && data[targetID]) {
+        name = data[targetID].name || name;
       }
       api.sendMessage(`🌸 ${name}، ${praise}`, threadID);
     });

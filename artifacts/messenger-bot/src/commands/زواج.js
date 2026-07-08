@@ -1,7 +1,21 @@
-const { getImageUrlFromPin, downloadImage } = require("../utils/pinterest");
+const { searchImages } = require("../utils/images");
+const { downloadImage } = require("../utils/pinterest");
 const fs = require("fs");
 
-const PIN_URL = "https://pin.it/7gZ6qnHTh";
+function sendImage(api, threadID, body, tmpPath) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("timeout")), 15000);
+    api.sendMessage(
+      { body, attachment: fs.createReadStream(tmpPath) },
+      threadID,
+      (err) => {
+        clearTimeout(timer);
+        fs.unlink(tmpPath, () => {});
+        if (err) reject(err); else resolve();
+      }
+    );
+  });
+}
 
 module.exports = {
   config: {
@@ -16,29 +30,23 @@ module.exports = {
   async run({ api, event, messageReply }) {
     const { threadID, senderID } = event;
 
-    if (!messageReply) {
+    if (!messageReply)
       return api.sendMessage("❌ رُدّ على رسالة الشخص الذي تريد الزواج منه!", threadID);
-    }
 
-    api.sendMessage("💍 جاري إحضار الصورة...", threadID, async () => {
-      try {
-        const imgUrl = await getImageUrlFromPin(PIN_URL);
-        if (!imgUrl) throw new Error("no image");
+    const target = messageReply.senderID;
+    const body   = `💍 تهانينا! ${senderID} تزوج من ${target} 🎊`;
 
-        const tmpPath = await downloadImage(imgUrl);
-        if (!tmpPath) throw new Error("download failed");
-
-        api.sendMessage(
-          {
-            body: `💍 تهانينا! ${senderID} تزوج من ${messageReply.senderID} 🎊`,
-            attachment: fs.createReadStream(tmpPath),
-          },
-          threadID,
-          () => fs.unlink(tmpPath, () => {})
-        );
-      } catch {
-        api.sendMessage(`💍 تهانينا! ${senderID} تزوج من ${messageReply.senderID} 🎊`, threadID);
+    try {
+      const urls = await searchImages("wedding couple romantic anime", 5);
+      for (const url of urls) {
+        const tmp = await downloadImage(url);
+        if (tmp) {
+          await sendImage(api, threadID, body, tmp);
+          return;
+        }
       }
-    });
+    } catch { /* يصل للـ fallback */ }
+
+    api.sendMessage(body, threadID);
   },
 };

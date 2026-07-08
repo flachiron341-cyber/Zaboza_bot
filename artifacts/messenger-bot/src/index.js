@@ -22,17 +22,40 @@ try {
   process.exit(1);
 }
 
-// ===== تسجيل الدخول =====
-logger.info("⏳ جاري تسجيل الدخول إلى فيسبوك...");
+// ===== تسجيل الدخول مع إعادة المحاولة =====
+const MAX_RETRIES = 5;
+const RETRY_DELAY_MS = 30000; // 30 ثانية
 
-login({ appState: appstate }, async (err, api) => {
-  if (err) {
-    logger.error("❌ فشل تسجيل الدخول: " + JSON.stringify(err));
-    process.exit(1);
-  }
+function startLogin(attempt = 1) {
+  logger.info(`⏳ جاري تسجيل الدخول إلى فيسبوك... (محاولة ${attempt}/${MAX_RETRIES})`);
+
+  login({ appState: appstate }, async (err, api) => {
+    if (err) {
+      const msg = err.error || JSON.stringify(err);
+      logger.error(`❌ فشل تسجيل الدخول: ${msg}`);
+
+      if (attempt < MAX_RETRIES) {
+        logger.info(`🔄 إعادة المحاولة بعد ${RETRY_DELAY_MS / 1000} ثانية...`);
+        setTimeout(() => startLogin(attempt + 1), RETRY_DELAY_MS);
+        return;
+      }
+
+      logger.error("🚫 تجاوزنا الحد الأقصى للمحاولات. يرجى تحديث appstate.json بكوكيز جديدة.");
+      process.exit(1);
+    }
+
+    doStart(api);
+  });
+}
+
+startLogin();
+
+async function doStart(api) {
 
   // حفظ الكوكيز المحدّثة
-  fs.writeFileSync(appstatePath, JSON.stringify(api.getAppState(), null, 2));
+  try {
+    fs.writeFileSync(appstatePath, JSON.stringify(api.getAppState(), null, 2));
+  } catch { /* تجاهل خطأ الكتابة */ }
 
   api.setOptions({
     listenEvents: config.listenEvents,
@@ -101,7 +124,7 @@ login({ appState: appstate }, async (err, api) => {
       }
     }
   }
-});
+}
 
 process.on("uncaughtException", (err) => {
   logger.error("خطأ غير متوقع: " + err.message);

@@ -24,21 +24,21 @@ module.exports = {
       return api.sendMessage("❌ النص طويل جداً! الحد الأقصى 200 حرف.", threadID);
     }
 
-    api.sendMessage("🎙️ جاري تحويل النص إلى صوت...", threadID, async () => {
-      const tmpPath = await textToSpeech(text);
+    api.sendMessage("🎙️ جاري تحويل النص إلى صوت...", threadID);
 
-      if (!tmpPath) {
-        return api.sendMessage("❌ فشل تحويل النص. حاول مرة أخرى.", threadID);
-      }
+    const tmpPath = await textToSpeech(text);
 
-      api.sendMessage(
-        {
-          body: `🔊 "${text}"`,
-          attachment: fs.createReadStream(tmpPath),
-        },
-        threadID,
-        () => fs.unlink(tmpPath, () => {})
-      );
-    });
+    if (!tmpPath) {
+      return api.sendMessage("❌ فشل تحويل النص. حاول مرة أخرى.", threadID);
+    }
+
+    api.sendMessage(
+      {
+        body: `🔊 "${text}"`,
+        attachment: fs.createReadStream(tmpPath),
+      },
+      threadID,
+      () => fs.unlink(tmpPath, () => {})
+    );
   },
 };

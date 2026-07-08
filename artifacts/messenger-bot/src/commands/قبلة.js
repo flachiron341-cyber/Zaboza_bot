@@ -1,7 +1,22 @@
-const { getImageUrlFromPin, downloadImage } = require("../utils/pinterest");
+const { searchImages } = require("../utils/images");
+const { downloadImage } = require("../utils/pinterest");
 const fs = require("fs");
 
-const PIN_URL = "https://pin.it/10owvvdzy";
+/** يرسل صورة مع نص — يحل بعد الإرسال أو يرفض بعد 15 ثانية */
+function sendImage(api, threadID, body, tmpPath) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("timeout")), 15000);
+    api.sendMessage(
+      { body, attachment: fs.createReadStream(tmpPath) },
+      threadID,
+      (err) => {
+        clearTimeout(timer);
+        fs.unlink(tmpPath, () => {});
+        if (err) reject(err); else resolve();
+      }
+    );
+  });
+}
 
 module.exports = {
   config: {
@@ -16,29 +31,23 @@ module.exports = {
   async run({ api, event, messageReply }) {
     const { threadID, senderID } = event;
 
-    if (!messageReply) {
+    if (!messageReply)
       return api.sendMessage("❌ رُدّ على رسالة الشخص الذي تريد تقبيله!", threadID);
-    }
 
-    api.sendMessage("💋 جاري إحضار الصورة...", threadID, async () => {
-      try {
-        const imgUrl = await getImageUrlFromPin(PIN_URL);
-        if (!imgUrl) throw new Error("لم يتم العثور على الصورة");
+    const target = messageReply.senderID;
+    const body   = `💋 ${senderID} قبّل ${target}! 😘`;
 
-        const tmpPath = await downloadImage(imgUrl);
-        if (!tmpPath) throw new Error("فشل تحميل الصورة");
-
-        api.sendMessage(
-          {
-            body: `💋 ${senderID} قبّل ${messageReply.senderID}!`,
-            attachment: fs.createReadStream(tmpPath),
-          },
-          threadID,
-          () => fs.unlink(tmpPath, () => {})
-        );
-      } catch (e) {
-        api.sendMessage(`💋 قبلة! 😘 (تعذّر إحضار الصورة)`, threadID);
+    try {
+      const urls = await searchImages("romantic anime kiss couple", 5);
+      for (const url of urls) {
+        const tmp = await downloadImage(url);
+        if (tmp) {
+          await sendImage(api, threadID, body, tmp);
+          return;
+        }
       }
-    });
+    } catch { /* يصل للـ fallback */ }
+
+    api.sendMessage(body, threadID);
   },
 };
