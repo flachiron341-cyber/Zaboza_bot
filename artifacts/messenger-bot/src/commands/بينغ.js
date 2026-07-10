@@ -7,11 +7,12 @@ module.exports = {
     cooldown: 3,
     adminOnly: false,
   },
+
   async run({ api, event }) {
+    const threadID = String(event.threadID);
     const start = Date.now();
-    api.sendMessage("🏓 جاري القياس...", event.threadID, () => {
-      const ping = Date.now() - start;
-      api.sendMessage(`🏓 البينغ: ${ping}ms`, event.threadID);
-    });
+    await api.sendMessage("🏓 جاري القياس...", threadID);
+    const ms = Date.now() - start;
+    await api.sendMessage(`🏓 بونغ!\n⚡ الاستجابة: ${ms}ms`, threadID);
   },
 };

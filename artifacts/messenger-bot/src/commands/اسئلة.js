@@ -26,65 +26,64 @@ const questions = [
   { q: "كم عدد أوتار الجيتار الكلاسيكي؟", a: "6" },
   { q: "ما هي اللغة الأكثر انتشاراً في العالم؟", a: "الإنجليزية" },
   { q: "كم عدد حواس الإنسان الأساسية؟", a: "5" },
+  { q: "ما هو أصغر بلد في العالم؟", a: "الفاتيكان" },
+  { q: "من كتب رواية الحرب والسلام؟", a: "تولستوي" },
+  { q: "كم مرة فاز المنتخب البرازيلي بكأس العالم؟", a: "5" },
+  { q: "ما هو الرقم الذري للذهب؟", a: "79" },
+  { q: "كم قمراً يملك كوكب المشتري تقريباً؟", a: "95" },
 ];
 
 module.exports = {
   config: {
     name: "اسئلة",
     aliases: ["سؤال", "quiz", "trivia"],
-    description: "يطرح سؤالاً ثقافياً عليك للإجابة خلال 30 ثانية",
+    description: "يطرح سؤالاً ثقافياً للإجابة خلال 30 ثانية",
     usage: "!اسئلة",
-    cooldown: 10,
+    cooldown: 5,
     adminOnly: false,
   },
 
   async run({ api, event }) {
-    const { threadID } = event;
+    const threadID = String(event.threadID);
 
     // فحص وجود جلسة نشطة
     for (const [, session] of state.gameSessions) {
-      if (session.threadID === threadID) {
-        return api.sendMessage("⚠️ يوجد سؤال نشط بالفعل! أجب عليه أولاً.", threadID);
-      }
+      if (session.threadID === threadID)
+        return api.sendMessage("⚠️ يوجد سؤال نشط! أجب عليه أولاً.", threadID);
     }
 
-    // اختيار سؤال عشوائي
     const q = questions[Math.floor(Math.random() * questions.length)];
 
-    // إرسال السؤال
-    api.sendMessage(
-      [
-        `╔══════════════════════╗`,
-        `║   🧠  سؤال ثقافي      ║`,
-        `╚══════════════════════╝`,
-        ``,
-        `❓ ${q.q}`,
-        ``,
-        `⏱ لديك 30 ثانية للإجابة`,
-        `💡 طريقة الإجابة: رُدّ على هذه الرسالة بالإجابة`,
-      ].join("\n"),
-      threadID,
-      (err, msgInfo) => {
-        if (err || !msgInfo) return;
+    // ws3-fca: sendMessage يعيد Promise مع { threadID, messageID, timestamp }
+    let msgInfo;
+    try {
+      msgInfo = await api.sendMessage(
+        [
+          `╔══════════════════════╗`,
+          `║   🧠  سؤال ثقافي      ║`,
+          `╚══════════════════════╝`,
+          ``,
+          `❓ ${q.q}`,
+          ``,
+          `⏱ لديك 30 ثانية للإجابة`,
+          `💡 ردّ على هذه الرسالة بالإجابة`,
+        ].join("\n"),
+        threadID
+      );
+    } catch {
+      return;
+    }
 
-        const msgID = msgInfo.messageID;
+    if (!msgInfo || !msgInfo.messageID) return;
 
-        // مؤقت 30 ثانية
-        const timer = setTimeout(() => {
-          state.gameSessions.delete(msgID);
-          api.sendMessage(
-            `⏰ انتهى الوقت! الإجابة الصحيحة كانت: ${q.a} 😔`,
-            threadID
-          );
-        }, 30000);
+    // تطبيع messageID دائماً لضمان مطابقة Map
+    const msgID = String(msgInfo.messageID);
 
-        state.gameSessions.set(msgID, {
-          msgID,
-          answer: q.a,
-          threadID,
-          timer,
-        });
-      }
-    );
+    const timer = setTimeout(() => {
+      state.gameSessions.delete(msgID);
+      api.sendMessage(`⏰ انتهى الوقت! الإجابة الصحيحة: ${q.a} 😔`, threadID);
+    }, 30000);
+
+    state.gameSessions.set(msgID, { msgID, answer: q.a, threadID, timer });
   },
 };

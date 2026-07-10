@@ -20,24 +20,22 @@ module.exports = {
   },
 
   async run({ api, event, messageReply }) {
-    const { threadID, senderID } = event;
+    const threadID = String(event.threadID);
+    const senderID = String(event.senderID);
 
-    if (!messageReply) {
+    if (!messageReply)
       return api.sendMessage("❌ ردّ على رسالة الشخص الذي تريد مدحه!", threadID);
-    }
 
-    if (String(messageReply.senderID) === String(senderID)) {
+    if (String(messageReply.senderID) === senderID)
       return api.sendMessage("😂 ما تقدر تمدح نفسك يا حبيب!", threadID);
-    }
 
     const targetID = String(messageReply.senderID);
-    const praise = praises[Math.floor(Math.random() * praises.length)];
+    const praise   = praises[Math.floor(Math.random() * praises.length)];
 
+    // api.getUserInfo يدعم callback
     api.getUserInfo(targetID, (err, data) => {
       let name = "صديقنا";
-      if (!err && data && data[targetID]) {
-        name = data[targetID].name || name;
-      }
+      if (!err && data && data[targetID]) name = data[targetID].name || name;
       api.sendMessage(`🌸 ${name}، ${praise}`, threadID);
     });
   },

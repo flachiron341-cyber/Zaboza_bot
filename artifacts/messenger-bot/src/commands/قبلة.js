@@ -1,22 +1,8 @@
-const { searchImages } = require("../utils/images");
-const { downloadImage } = require("../utils/pinterest");
+const { downloadImage } = require("../utils/images");
 const fs = require("fs");
 
-/** يرسل صورة مع نص — يحل بعد الإرسال أو يرفض بعد 15 ثانية */
-function sendImage(api, threadID, body, tmpPath) {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("timeout")), 15000);
-    api.sendMessage(
-      { body, attachment: fs.createReadStream(tmpPath) },
-      threadID,
-      (err) => {
-        clearTimeout(timer);
-        fs.unlink(tmpPath, () => {});
-        if (err) reject(err); else resolve();
-      }
-    );
-  });
-}
+// روابط محددة للقبلة — loremflickr بـ tags واضحة
+const TAGS = ["kiss,romantic", "couple,kiss,love", "kiss,anime", "romantic,couple"];
 
 module.exports = {
   config: {
@@ -29,25 +15,31 @@ module.exports = {
   },
 
   async run({ api, event, messageReply }) {
-    const { threadID, senderID } = event;
+    const threadID = String(event.threadID);
+    const senderID = String(event.senderID);
 
     if (!messageReply)
       return api.sendMessage("❌ رُدّ على رسالة الشخص الذي تريد تقبيله!", threadID);
 
-    const target = messageReply.senderID;
+    const target = String(messageReply.senderID);
     const body   = `💋 ${senderID} قبّل ${target}! 😘`;
 
-    try {
-      const urls = await searchImages("romantic anime kiss couple", 5);
-      for (const url of urls) {
-        const tmp = await downloadImage(url);
-        if (tmp) {
-          await sendImage(api, threadID, body, tmp);
-          return;
-        }
-      }
-    } catch { /* يصل للـ fallback */ }
-
-    api.sendMessage(body, threadID);
+    await sendWithImage(api, threadID, body, TAGS);
   },
 };
+
+async function sendWithImage(api, threadID, body, tags) {
+  // نجرّب كل تاج حتى نحصل على صورة
+  for (let i = 0; i < tags.length; i++) {
+    const url = `https://loremflickr.com/600/600/${tags[i]}?lock=${Math.floor(Math.random() * 999) + 1}`;
+    const tmp = await downloadImage(url);
+    if (!tmp) continue;
+    try {
+      await api.sendMessage({ body, attachment: fs.createReadStream(tmp) }, threadID);
+      return;
+    } catch { /* جرّب التاج التالي */ }
+    finally { fs.unlink(tmp, () => {}); }
+  }
+  // fallback نصي
+  await api.sendMessage(body, threadID);
+}

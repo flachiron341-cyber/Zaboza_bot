@@ -1,42 +1,54 @@
 const axios = require("axios");
-const fs = require("fs");
-const path = require("path");
+const fs    = require("fs");
+const path  = require("path");
 
 /**
- * يحوّل نصاً عربياً إلى ملف صوتي مؤقت ويعيد مساره
- * يستخدم Google Translate TTS (غير رسمي - مجاني)
- * @param {string} text
- * @returns {Promise<string|null>}
+ * يحوّل نصاً إلى ملف صوتي مؤقت (arraybuffer للموثوقية)
  */
 async function textToSpeech(text) {
-  try {
-    const safeText = text.substring(0, 200); // حد أقصى 200 حرف
-    const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(
-      safeText
-    )}&tl=ar&sl=ar&client=gtx`;
+  const safeText = String(text).slice(0, 200);
+  const tmpPath  = path.join("/tmp", `tts_${Date.now()}.mp3`);
 
-    const tmpPath = path.join("/tmp", `tts_${Date.now()}.mp3`);
-    const res = await axios.get(url, {
-      responseType: "stream",
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        Referer: "https://translate.google.com/",
-      },
-      timeout: 15000,
-    });
+  const endpoints = [
+    () => axios.get(
+      `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(safeText)}&tl=ar&sl=ar&client=tw-ob`,
+      {
+        responseType: "arraybuffer",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Referer": "https://translate.google.com/",
+          "Accept-Language": "ar,en;q=0.9",
+        },
+        timeout: 15000,
+      }
+    ),
+    () => axios.get(
+      `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(safeText)}&tl=ar&client=gtx`,
+      {
+        responseType: "arraybuffer",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
+          "Referer": "https://translate.google.com/",
+        },
+        timeout: 15000,
+      }
+    ),
+  ];
 
-    const writer = fs.createWriteStream(tmpPath);
-    res.data.pipe(writer);
-    await new Promise((resolve, reject) => {
-      writer.on("finish", resolve);
-      writer.on("error", reject);
-    });
+  for (const attempt of endpoints) {
+    try {
+      const res = await attempt();
+      if (!res || !res.data || res.data.byteLength < 100) continue;
 
-    return tmpPath;
-  } catch {
-    return null;
+      const ct = res.headers["content-type"] || "";
+      if (!ct.includes("audio") && !ct.includes("mpeg")) continue;
+
+      fs.writeFileSync(tmpPath, Buffer.from(res.data));
+      return tmpPath;
+    } catch {}
   }
+
+  return null;
 }
 
 module.exports = { textToSpeech };

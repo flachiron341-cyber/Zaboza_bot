@@ -9,41 +9,12 @@ module.exports = {
   },
 
   async run({ api, event, args }) {
-    const { threadID } = event;
+    const threadID = String(event.threadID);
 
-    // ── إزالة كل الكنيات ──
     if (args[0] === "عكس" || args[0] === "reset") {
-      api.sendMessage("🔄 جاري إزالة كل الكنيات...", threadID);
-
-      api.getThreadInfo(threadID, (err, info) => {
-        if (err || !info) {
-          return api.sendMessage("❌ فشل الحصول على معلومات القروب.", threadID);
-        }
-
-        const participants = info.participantIDs || [];
-        let done = 0;
-        let failed = 0;
-        const total = participants.length;
-
-        if (total === 0) return api.sendMessage("⚠️ لا يوجد أعضاء.", threadID);
-
-        participants.forEach((uid) => {
-          api.changeNickname("", threadID, uid, (e) => {
-            if (e) failed++;
-            else done++;
-            if (done + failed === total) {
-              api.sendMessage(
-                `✅ تم إزالة الكنيات\n✔ نجح: ${done} | ✖ فشل: ${failed}`,
-                threadID
-              );
-            }
-          });
-        });
-      });
-      return;
+      return applyNickname(api, threadID, "");
     }
 
-    // ── تعيين كنية لكل الأعضاء ──
     if (!args.length) {
       return api.sendMessage(
         "❌ اكتب الكنية!\nأمثلة:\n  !كين ⭐ نجم القروب\n  !كين عكس  (لإزالة الكنيات)",
@@ -51,33 +22,51 @@ module.exports = {
       );
     }
 
-    const nickname = args.join(" ");
-    api.sendMessage(`⏳ جاري تعيين كنية "${nickname}" لكل الأعضاء...`, threadID);
-
-    api.getThreadInfo(threadID, (err, info) => {
-      if (err || !info) {
-        return api.sendMessage("❌ فشل الحصول على معلومات القروب.", threadID);
-      }
-
-      const participants = info.participantIDs || [];
-      let done = 0;
-      let failed = 0;
-      const total = participants.length;
-
-      if (total === 0) return api.sendMessage("⚠️ لا يوجد أعضاء.", threadID);
-
-      participants.forEach((uid) => {
-        api.changeNickname(nickname, threadID, uid, (e) => {
-          if (e) failed++;
-          else done++;
-          if (done + failed === total) {
-            api.sendMessage(
-              `✅ تم تعيين الكنية: "${nickname}"\n✔ نجح: ${done} | ✖ فشل: ${failed}`,
-              threadID
-            );
-          }
-        });
-      });
-    });
+    return applyNickname(api, threadID, args.join(" "));
   },
 };
+
+async function applyNickname(api, threadID, nickname) {
+  const label = nickname ? `تعيين كنية "${nickname}"` : "إزالة الكنيات";
+  await api.sendMessage(`⏳ جاري ${label}...`, threadID);
+
+  // جلب معلومات القروب
+  const info = await new Promise((resolve) => {
+    api.getThreadInfo(threadID, (err, data) => resolve(err ? null : data));
+  });
+
+  if (!info) {
+    return api.sendMessage("❌ فشل الحصول على معلومات القروب.", threadID);
+  }
+
+  const participants = (info.participantIDs || []).map(String);
+  if (!participants.length) {
+    return api.sendMessage("⚠️ لا يوجد أعضاء في القروب.", threadID);
+  }
+
+  let done = 0;
+  let failed = 0;
+
+  // معالجة متسلسلة مع تأخير 800ms بين كل طلب لتجنّب حظر فيسبوك
+  for (const uid of participants) {
+    try {
+      // api.setNickname هو الاسم الصحيح في ws3-fca
+      await new Promise((resolve, reject) => {
+        api.setNickname(nickname, threadID, uid, (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+      done++;
+    } catch {
+      failed++;
+    }
+    await new Promise((r) => setTimeout(r, 800));
+  }
+
+  const icon = nickname ? "✅" : "🔄";
+  await api.sendMessage(
+    `${icon} ${label}\n✔ نجح: ${done} | ✖ فشل: ${failed}`,
+    threadID
+  );
+}

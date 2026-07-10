@@ -12,33 +12,29 @@ module.exports = {
   },
 
   async run({ api, event, args }) {
-    const { threadID } = event;
+    const threadID = String(event.threadID);
 
-    if (!args.length) {
-      return api.sendMessage("❌ اكتب النص الذي تريد تحويله!\nمثال: !قول مرحبا كيف حالك", threadID);
-    }
+    if (!args.length)
+      return api.sendMessage("❌ اكتب النص!\nمثال: !قول ميااو", threadID);
 
     const text = args.join(" ");
-
-    if (text.length > 200) {
+    if (text.length > 200)
       return api.sendMessage("❌ النص طويل جداً! الحد الأقصى 200 حرف.", threadID);
-    }
 
-    api.sendMessage("🎙️ جاري تحويل النص إلى صوت...", threadID);
+    await api.sendMessage("🎙️ جاري تحويل النص إلى صوت...", threadID);
 
     const tmpPath = await textToSpeech(text);
 
-    if (!tmpPath) {
-      return api.sendMessage("❌ فشل تحويل النص. حاول مرة أخرى.", threadID);
-    }
+    if (!tmpPath)
+      return api.sendMessage(`🔊 "${text}"\n(تعذّر توليد الصوت، حاول لاحقاً)`, threadID);
 
-    api.sendMessage(
-      {
-        body: `🔊 "${text}"`,
-        attachment: fs.createReadStream(tmpPath),
-      },
-      threadID,
-      () => fs.unlink(tmpPath, () => {})
-    );
+    try {
+      await api.sendMessage(
+        { body: `🔊 "${text}"`, attachment: fs.createReadStream(tmpPath) },
+        threadID
+      );
+    } finally {
+      fs.unlink(tmpPath, () => {});
+    }
   },
 };

@@ -11,7 +11,7 @@ module.exports = {
   },
 
   async run({ api, event, args }) {
-    const { threadID } = event;
+    const threadID = String(event.threadID);
 
     // ── إيقاف الحماية ──
     if (args[0] === "ايقاف" || args[0] === "off") {
@@ -23,40 +23,40 @@ module.exports = {
     }
 
     // ── تفعيل الحماية ──
-    api.sendMessage("⏳ جاري تفعيل الحماية وحفظ البيانات الحالية...", threadID);
+    await api.sendMessage("⏳ جاري تفعيل الحماية...", threadID);
 
-    api.getThreadInfo(threadID, (err, info) => {
-      if (err || !info) {
-        return api.sendMessage("❌ فشل الحصول على معلومات القروب.", threadID);
-      }
-
-      const currentName = info.threadName || "";
-      const nicknames = new Map();
-
-      // حفظ كنيات الأعضاء الحالية
-      const customization = info.nicknames || {};
-      for (const [uid, nick] of Object.entries(customization)) {
-        if (nick) nicknames.set(uid, nick);
-      }
-
-      state.protectionState.set(threadID, {
-        active: true,
-        name: currentName,
-        nicknames,
-      });
-
-      api.sendMessage(
-        [
-          `🛡️ تم تفعيل الحماية!`,
-          ``,
-          `📛 الاسم المحمي: "${currentName}"`,
-          `👥 الكنيات المحفوظة: ${nicknames.size}`,
-          ``,
-          `أي تغيير في الاسم أو الكنيات سيُعاد تلقائياً.`,
-          `لإيقاف الحماية: !حماية ايقاف`,
-        ].join("\n"),
-        threadID
-      );
+    const info = await new Promise((resolve) => {
+      api.getThreadInfo(threadID, (err, data) => resolve(err ? null : data));
     });
+
+    if (!info) {
+      return api.sendMessage("❌ فشل الحصول على معلومات القروب.", threadID);
+    }
+
+    const currentName = info.threadName || "";
+    const nicknames   = new Map();
+
+    const customization = info.nicknames || {};
+    for (const [uid, nick] of Object.entries(customization)) {
+      if (nick) nicknames.set(String(uid), nick);
+    }
+
+    state.protectionState.set(threadID, {
+      active: true,
+      name:   currentName,
+      nicknames,
+    });
+
+    await api.sendMessage(
+      [
+        `🛡️ تم تفعيل الحماية!`,
+        ``,
+        `📛 الاسم المحمي: "${currentName}"`,
+        `👥 الكنيات المحفوظة: ${nicknames.size}`,
+        ``,
+        `للإيقاف: !حماية ايقاف`,
+      ].join("\n"),
+      threadID
+    );
   },
 };

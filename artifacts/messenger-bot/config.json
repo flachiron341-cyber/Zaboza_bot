@@ -2,7 +2,7 @@
   "prefix": "!",
   "botName": "zaboza bot",
   "language": "ar",
-  "adminUIDs": [],
+  "adminUIDs": ["61566199065542"],
   "cooldown": 3,
   "autoReact": true,
   "autoReactEmoji": "👍",

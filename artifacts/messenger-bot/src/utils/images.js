@@ -1,38 +1,44 @@
 const axios = require("axios");
+const fs    = require("fs");
+const path  = require("path");
 
-const UA =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 /**
- * يبحث عن صور في Bing Images ويعيد روابط (حتى count رابط)
- * @param {string} query
- * @param {number} count
- * @returns {Promise<string[]>}
+ * يُنشئ روابط صور من loremflickr بكلمة البحث (إنجليزية)
  */
-async function searchImages(query, count = 4) {
+function searchImages(query, count = 4) {
+  const encoded = encodeURIComponent(query.trim().replace(/\s+/g, ","));
+  return Array.from({ length: count }, (_, i) =>
+    `https://loremflickr.com/600/600/${encoded}?lock=${i + Math.floor(Math.random() * 900)}`
+  );
+}
+
+/**
+ * يُحمّل صورة من URL ويحفظها ملفاً مؤقتاً (arraybuffer → يتبع الـ redirects)
+ */
+async function downloadImage(imageUrl) {
+  const tmpPath = path.join("/tmp", `img_${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`);
   try {
-    const url = `https://www.bing.com/images/search?q=${encodeURIComponent(
-      query
-    )}&form=HDRSC2&first=1&tsc=ImageBasicHover`;
-    const res = await axios.get(url, {
+    const res = await axios.get(imageUrl, {
+      responseType: "arraybuffer",
       headers: {
         "User-Agent": UA,
-        Accept: "text/html",
-        "Accept-Language": "ar,en;q=0.9",
+        "Accept": "image/webp,image/jpeg,image/*,*/*;q=0.8",
+        "Referer": "https://www.google.com/",
       },
-      timeout: 15000,
+      maxRedirects: 10,
+      timeout: 20000,
     });
-    // استخراج روابط الصور من JSON المضمّن في HTML
-    const matches = [
-      ...res.data.matchAll(/"murl":"(https?:\/\/(?!www\.bing)[^"]+?\.(?:jpg|jpeg|png|webp))"/gi),
-    ];
-    const urls = matches.map((m) => m[1].replace(/\\\//g, "/"));
-    // إزالة التكرارات
-    const unique = [...new Set(urls)];
-    return unique.slice(0, count);
+
+    if (!res.data || res.data.byteLength < 500) return null;
+
+    fs.writeFileSync(tmpPath, Buffer.from(res.data));
+    return tmpPath;
   } catch {
-    return [];
+    try { fs.unlinkSync(tmpPath); } catch {}
+    return null;
   }
 }
 
-module.exports = { searchImages };
+module.exports = { searchImages, downloadImage };

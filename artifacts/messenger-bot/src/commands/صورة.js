@@ -1,5 +1,5 @@
-const { searchImages } = require("../utils/images");
-const { downloadImage } = require("../utils/pinterest");
+const { searchImages, downloadImage } = require("../utils/images");
+const { toEnglishQuery }              = require("../utils/translate");
 const fs = require("fs");
 
 module.exports = {
@@ -13,44 +13,44 @@ module.exports = {
   },
 
   async run({ api, event, args }) {
-    const { threadID } = event;
+    const threadID = String(event.threadID);
 
-    if (!args.length) {
-      return api.sendMessage("❌ اكتب ما تريد البحث عنه!\nمثال: !صورة سيارات", threadID);
+    if (!args.length)
+      return api.sendMessage(
+        "❌ اكتب ما تريد البحث عنه!\nمثال: !صورة ميسي | !صورة قطة | !صورة بحر",
+        threadID
+      );
+
+    const arabicQuery = args.join(" ");
+    const engQuery    = toEnglishQuery(arabicQuery);
+
+    await api.sendMessage(`🔍 جاري البحث عن صور "${arabicQuery}"...`, threadID);
+
+    // ننشئ 4 روابط بـ seeds مختلفة
+    const urls       = searchImages(engQuery, 4);
+    const validPaths = [];
+
+    for (const url of urls) {
+      const p = await downloadImage(url);
+      if (p) validPaths.push(p);
     }
 
-    const query = args.join(" ");
-    api.sendMessage(`🔍 جاري البحث عن صور "${query}"...`, threadID);
+    if (!validPaths.length)
+      return api.sendMessage(
+        `❌ لم أتمكن من إحضار صور لـ "${arabicQuery}".\nحاول بكلمة أخرى.`,
+        threadID
+      );
 
     try {
-      const urls = await searchImages(query, 6);
-
-      if (!urls.length) {
-        return api.sendMessage(`❌ لم أجد صوراً لـ "${query}". حاول بكلمة مختلفة.`, threadID);
-      }
-
-      // تحميل الصور بشكل متسلسل حتى نحصل على 4 صور صالحة
-      const validPaths = [];
-      for (const url of urls) {
-        if (validPaths.length >= 4) break;
-        const p = await downloadImage(url);
-        if (p) validPaths.push(p);
-      }
-
-      if (!validPaths.length) {
-        return api.sendMessage(`❌ فشل تحميل الصور. حاول مرة أخرى.`, threadID);
-      }
-
-      api.sendMessage(
+      await api.sendMessage(
         {
-          body: `🖼️ ${validPaths.length} صور لـ "${query}"`,
+          body:       `🖼️ ${validPaths.length} صور لـ "${arabicQuery}"`,
           attachment: validPaths.map((p) => fs.createReadStream(p)),
         },
-        threadID,
-        () => validPaths.forEach((p) => fs.unlink(p, () => {}))
+        threadID
       );
-    } catch (e) {
-      api.sendMessage(`❌ حدث خطأ أثناء البحث.`, threadID);
+    } finally {
+      validPaths.forEach((p) => fs.unlink(p, () => {}));
     }
   },
 };
