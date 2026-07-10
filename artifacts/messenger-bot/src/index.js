@@ -5,20 +5,63 @@ const config  = require("../config.json");
 const handler = require("./handler");
 const logger  = require("./utils/logger");
 const state   = require("./state");
+const { parseCookieString } = require("./utils/parseCookies");
+
+// ===== مسارات الملفات =====
+const appstatePath  = path.join(__dirname, "../appstate.json");
+const cookiesTxtPath = path.join(__dirname, "../cookies.txt");
 
 // ===== تحميل الكوكيز =====
-const appstatePath = path.join(__dirname, "../appstate.json");
-let appstate;
+function loadAppState() {
+  // ── محاولة 1: قراءة cookies.txt إذا تم تحديثه مؤخراً أو appstate.json فارغ ──
+  if (fs.existsSync(cookiesTxtPath)) {
+    try {
+      const raw = fs.readFileSync(cookiesTxtPath, "utf-8");
+      // احذف التعليقات والأسطر الفارغة
+      const cookieLine = raw
+        .split("\n")
+        .filter((l) => l.trim() && !l.trim().startsWith("#"))
+        .join(";");
 
-try {
-  const raw = fs.readFileSync(appstatePath, "utf-8");
-  appstate  = JSON.parse(raw);
-  if (!Array.isArray(appstate) || appstate.length === 0) {
-    logger.error("❌ ملف appstate.json فارغ — ضع فيه الكوكيز أولاً.");
-    process.exit(1);
+      if (cookieLine.trim()) {
+        const parsed = parseCookieString(cookieLine);
+        if (parsed.length > 0) {
+          logger.info(`🍪 قُرئت ${parsed.length} كوكي من cookies.txt`);
+          // احفظها في appstate.json لتسريع الدورات التالية
+          fs.writeFileSync(appstatePath, JSON.stringify(parsed, null, 2));
+          return parsed;
+        }
+      }
+    } catch (e) {
+      logger.error("⚠️ فشل قراءة cookies.txt: " + e.message);
+    }
   }
-} catch (e) {
-  logger.error("❌ تعذّر قراءة appstate.json: " + e.message);
+
+  // ── محاولة 2: appstate.json ──
+  if (fs.existsSync(appstatePath)) {
+    try {
+      const raw  = fs.readFileSync(appstatePath, "utf-8");
+      const data = JSON.parse(raw);
+      if (Array.isArray(data) && data.length > 0) {
+        logger.info(`🍪 قُرئت ${data.length} كوكي من appstate.json`);
+        return data;
+      }
+    } catch (e) {
+      logger.error("⚠️ فشل قراءة appstate.json: " + e.message);
+    }
+  }
+
+  return null;
+}
+
+const appstate = loadAppState();
+
+if (!appstate) {
+  logger.error(
+    "❌ لا يوجد كوكيز صالح!\n" +
+    "   افتح ملف cookies.txt وضع فيه كوكيز فيسبوك.\n" +
+    "   راجع التعليمات داخل الملف."
+  );
   process.exit(1);
 }
 
@@ -39,7 +82,10 @@ function startLogin(attempt = 1) {
         setTimeout(() => startLogin(attempt + 1), delay);
         return;
       }
-      logger.error("🚫 تجاوزنا الحد الأقصى. يرجى تحديث appstate.json.");
+      logger.error(
+        "🚫 تجاوزنا الحد الأقصى من المحاولات.\n" +
+        "   ربما انتهت صلاحية الكوكيز — جدّد ملف cookies.txt."
+      );
       process.exit(1);
     }
     startBot(api);
@@ -77,29 +123,23 @@ function startBot(api) {
     const senderID = String(event.senderID || "");
     if (senderID === String(botID)) return;
 
-    // رسائل نصية
     if (event.type === "message" || event.type === "message_reply") {
       handler.handleMessage(api, event, config, botID).catch((e) => {
         logger.error("خطأ غير متوقع: " + e.message);
       });
     }
 
-    // أحداث القروب
     if (event.type === "event") {
       handleGroupEvent(api, event);
     }
   });
 
-  // ──────────────────────────────────────────────
-  //  معالج أحداث القروب
-  // ──────────────────────────────────────────────
   function handleGroupEvent(api, event) {
     const threadID       = String(event.threadID || "");
     const logMessageType = event.logMessageType;
     const protection     = state.protectionState.get(threadID);
     if (!protection || !protection.active) return;
 
-    // ── حماية اسم القروب ──
     if (logMessageType === "log:thread-name") {
       const newName = event.logMessageData && event.logMessageData.name;
       if (newName !== undefined && newName !== protection.name) {
@@ -112,12 +152,11 @@ function startBot(api) {
       }
     }
 
-    // ── حماية الكنيات ──
     if (logMessageType === "log:user-nickname") {
       const changedUID = event.logMessageData && String(event.logMessageData.participant_id || "");
       if (changedUID && protection.nicknames && protection.nicknames.has(changedUID)) {
         const savedNick = protection.nicknames.get(changedUID);
-        logger.info(`🛡 محاولة تغيير كنية ${changedUID} → إعادتها: "${savedNick}"`);
+        logger.info(`🛡 تغيير كنية ${changedUID} → إعادتها: "${savedNick}"`);
         setTimeout(() => {
           api.setNickname(savedNick, threadID, changedUID, (err) => {
             if (!err) logger.info(`✅ أُعيدت كنية ${changedUID}: "${savedNick}"`);
@@ -128,7 +167,6 @@ function startBot(api) {
   }
 }
 
-// ===== حفظ الكوكيز =====
 function saveAppState(api) {
   try {
     const s = api.getAppState();
