@@ -8,20 +8,26 @@ const state   = require("./state");
 const { parseCookieString } = require("./utils/parseCookies");
 
 // ===== مسارات الملفات =====
-const appstatePath  = path.join(__dirname, "../appstate.json");
 const manualAppstatePath = path.join(__dirname, "../manual-appstate.json");
 const cookiesTxtPath = path.join(__dirname, "../cookies.txt");
 
 // ===== تحميل الكوكيز =====
+function isUsableAppState(data) {
+  if (!Array.isArray(data) || data.length === 0) return false;
+  const keys = new Set(data.map((cookie) => String(cookie?.key || cookie?.name || "")));
+  return keys.has("c_user") && keys.has("xs");
+}
+
 function loadAppState() {
   // ── المصدر الأساسي: ملف يدوي لا يكتبه البوت ولا أي كود داخلي ──
   if (fs.existsSync(manualAppstatePath)) {
     try {
       const data = JSON.parse(fs.readFileSync(manualAppstatePath, "utf-8"));
-      if (Array.isArray(data) && data.length > 0) {
+      if (isUsableAppState(data)) {
         logger.info(`🍪 قُرئت ${data.length} كوكي من manual-appstate.json`);
         return data;
       }
+      logger.error("⚠️ manual-appstate.json لا يحتوي c_user و xs.");
     } catch (e) {
       logger.error("⚠️ فشل قراءة manual-appstate.json: " + e.message);
     }
@@ -39,7 +45,7 @@ function loadAppState() {
 
       if (cookieLine.trim()) {
         const parsed = parseCookieString(cookieLine);
-        if (parsed.length > 0) {
+        if (isUsableAppState(parsed)) {
           logger.info(`🍪 قُرئت ${parsed.length} كوكي من cookies.txt`);
           // لا نكتب الكوكيز إلى أي ملف؛ ملفات الجلسة تبقى يدوية وثابتة.
           return parsed;
@@ -50,66 +56,74 @@ function loadAppState() {
     }
   }
 
-  // ── محاولة 3: appstate.json القديم ──
-  if (fs.existsSync(appstatePath)) {
-    try {
-      const raw  = fs.readFileSync(appstatePath, "utf-8");
-      const data = JSON.parse(raw);
-      if (Array.isArray(data) && data.length > 0) {
-        logger.info(`🍪 قُرئت ${data.length} كوكي من appstate.json`);
-        return data;
-      }
-    } catch (e) {
-      logger.error("⚠️ فشل قراءة appstate.json: " + e.message);
-    }
-  }
-
   return null;
 }
 
-const appstate = loadAppState();
+// ===== تسجيل الدخول مع إعادة المحاولة =====
+const RETRY_BASE_MS = 30000;
+const MAX_RETRY_DELAY_MS = 5 * 60 * 1000;
+let retryTimer = null;
+let loginInProgress = false;
+let activeAPI = null;
 
-if (!appstate) {
-  logger.error(
-    "❌ لا يوجد كوكيز صالح!\n" +
-    "   افتح ملف cookies.txt وضع فيه كوكيز فيسبوك.\n" +
-    "   راجع التعليمات داخل الملف."
-  );
-  process.exit(1);
+function scheduleLogin(attempt = 1, overrideDelay = null) {
+  if (retryTimer || loginInProgress) return;
+  const delay = overrideDelay ?? Math.min(RETRY_BASE_MS * attempt, MAX_RETRY_DELAY_MS);
+  logger.info(`🔄 إعادة المحاولة بعد ${Math.ceil(delay / 1000)}ث...`);
+  retryTimer = setTimeout(() => {
+    retryTimer = null;
+    startLogin(attempt);
+  }, delay);
 }
 
-// ===== تسجيل الدخول مع إعادة المحاولة =====
-const MAX_RETRIES   = 10;
-const RETRY_BASE_MS = 30000;
-
 function startLogin(attempt = 1) {
-  const delay = Math.min(RETRY_BASE_MS * attempt, 5 * 60 * 1000);
-  logger.info(`⏳ جاري تسجيل الدخول... (محاولة ${attempt}/${MAX_RETRIES})`);
+  if (loginInProgress) return;
+  loginInProgress = true;
 
-  login({ appState: appstate }, (err, api) => {
+  // نعيد قراءة الملف اليدوي في كل محاولة حتى لا تستخدم المكتبة نسخة
+  // قد تكون عدّلتها أثناء محاولة سابقة.
+  const appstate = loadAppState();
+  if (!appstate) {
+    loginInProgress = false;
+    logger.error(
+      "❌ لا يوجد كوكيز صالح في manual-appstate.json.\n" +
+      "   ضع تصدير المتصفح في cookies.txt ثم شغّل مثبت الكوكيز."
+    );
+    scheduleLogin(attempt + 1);
+    return;
+  }
+
+  logger.info(`⏳ جاري تسجيل الدخول... (محاولة ${attempt})`);
+
+  login(
+    { appState: appstate },
+    {
+      autoReconnect: false,
+      listenEvents: config.listenEvents,
+      selfListen: false,
+      logLevel: "silent",
+    },
+    (err, api) => {
+    loginInProgress = false;
     if (err) {
       const msg = err.error || JSON.stringify(err);
       logger.error(`❌ فشل تسجيل الدخول: ${msg}`);
-      if (attempt < MAX_RETRIES) {
-        logger.info(`🔄 إعادة المحاولة بعد ${delay / 1000}ث...`);
-        setTimeout(() => startLogin(attempt + 1), delay);
-        return;
-      }
-      logger.error(
-        "🚫 تجاوزنا الحد الأقصى من المحاولات.\n" +
-        "   ربما انتهت صلاحية الكوكيز — جدّد ملف cookies.txt."
-      );
-      process.exit(1);
+      scheduleLogin(attempt + 1);
+      return;
     }
     startBot(api);
-  });
+    }
+  );
 }
 
 function startBot(api) {
+  activeAPI = api;
+
   api.setOptions({
     listenEvents: config.listenEvents,
     selfListen:   false,
     logLevel:     "silent",
+    autoReconnect: false,
   });
 
   const botID = api.getCurrentUserID();
@@ -121,8 +135,10 @@ function startBot(api) {
     if (err) {
       const msg = err.error || err.message || JSON.stringify(err);
       logger.error("خطأ في الاستماع: " + msg);
+      if (api !== activeAPI) return;
+      activeAPI = null;
       logger.info("🔄 انقطع الاتصال — إعادة تسجيل الدخول بعد 5 ثواني...");
-      setTimeout(() => startLogin(1), 5000);
+      scheduleLogin(1, 5000);
       return;
     }
     if (!event) return;

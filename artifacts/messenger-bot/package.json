@@ -6,7 +6,8 @@
   "type": "commonjs",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "node src/index.js"
+    "dev": "node src/index.js",
+    "fix-cookies": "node scripts/fix-cookies.js"
   },
   "dependencies": {
     "axios": "^1.18.1",
