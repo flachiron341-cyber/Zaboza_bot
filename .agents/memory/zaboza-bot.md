@@ -8,7 +8,7 @@ description: بوت فيسبوك مسنجر عربي — هيكله وقرارا
 - `src/index.js` — تسجيل الدخول (retry 10×)، listenMqtt، حماية القروب
 - `src/handler.js` — يُطبّع كل IDs عبر normalizeEvent()، يُوزّع للأوامر
 - `src/state.js` — gameSessions, mathSessions, attackState, videoSessions, protectionState
-- `src/commands/*.js` — 22 أمر بالعربية
+- `src/commands/*.js` — أوامر عربية محملة ديناميكياً؛ راجع المجلد للقائمة الحالية
 - `src/utils/images.js` — downloadImage بـ arraybuffer
 - `src/utils/tts.js` — Google Translate TTS
 - `src/utils/youtube.js` — ytsr + ytdl-core + fluent-ffmpeg
