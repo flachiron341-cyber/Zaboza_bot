@@ -8,6 +8,7 @@ const state   = require("./state");
 const { parseCookieString } = require("./utils/parseCookies");
 
 // ===== مسارات الملفات =====
+const appstateSecretName = "FACEBOOK_APPSTATE";
 const manualAppstatePath = path.join(__dirname, "../manual-appstate.json");
 const cookiesTxtPath = path.join(__dirname, "../cookies.txt");
 
@@ -18,8 +19,37 @@ function isUsableAppState(data) {
   return keys.has("c_user") && keys.has("xs");
 }
 
+function parseAppStateSecret(rawValue) {
+  const raw = String(rawValue || "").trim();
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw);
+    const appstate = Array.isArray(parsed)
+      ? parsed
+      : parsed?.appState || parsed?.appstate || parsed?.cookies;
+    if (isUsableAppState(appstate)) return appstate;
+  } catch {
+    // السر قد يكون Cookie header بدلاً من JSON.
+  }
+
+  const parsedCookies = parseCookieString(raw);
+  return isUsableAppState(parsedCookies) ? parsedCookies : null;
+}
+
 function loadAppState() {
-  // ── المصدر الأساسي: ملف يدوي لا يكتبه البوت ولا أي كود داخلي ──
+  // ── المصدر الأساسي: سر Replit لا يظهر محتواه في السجلات ──
+  const secretValue = process.env[appstateSecretName];
+  if (secretValue) {
+    const secretAppstate = parseAppStateSecret(secretValue);
+    if (secretAppstate) {
+      logger.info(`🍪 قُرئت ${secretAppstate.length} كوكي من سر ${appstateSecretName}`);
+      return secretAppstate;
+    }
+    logger.error(`⚠️ سر ${appstateSecretName} لا يحتوي appstate صالحاً.`);
+  }
+
+  // ── المصدر الاحتياطي: ملف يدوي لا يكتبه البوت ولا أي كود داخلي ──
   if (fs.existsSync(manualAppstatePath)) {
     try {
       const data = JSON.parse(fs.readFileSync(manualAppstatePath, "utf-8"));
@@ -86,7 +116,7 @@ function startLogin(attempt = 1) {
   if (!appstate) {
     loginInProgress = false;
     logger.error(
-      "❌ لا يوجد كوكيز صالح في manual-appstate.json.\n" +
+      `❌ لا يوجد كوكيز صالح في ${appstateSecretName} أو manual-appstate.json.\n` +
       "   ضع تصدير المتصفح في cookies.txt ثم شغّل مثبت الكوكيز."
     );
     scheduleLogin(attempt + 1);

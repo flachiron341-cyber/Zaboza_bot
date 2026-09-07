@@ -6,8 +6,16 @@
 
 ## ⚡ طريقة التشغيل
 
-### 1. ضع الكوكيز
-افتح `appstate.json` وضع فيه الكوكيز (بصيغة JSON مصفوفة).
+### 1. أضف الكوكيز بأمان
+احفظ تصدير الكوكيز في سر Replit باسم:
+
+```text
+FACEBOOK_APPSTATE
+```
+
+يمكن أن تكون قيمة السر مصفوفة appstate بصيغة JSON أو Cookie header نصياً. يقرأ
+البوت السر أولاً ولا يطبع قيمته في السجلات. يوجد `manual-appstate.json` كخيار
+احتياطي محلي فقط.
 
 > يمكنك استخدام إضافة [c3c-fbstate](https://github.com/c3cbot/c3c-fbstate) للمتصفح لتصدير الكوكيز.
 
@@ -41,7 +49,7 @@ messenger-bot/
 │   │   └── uid.js
 │   └── utils/
 │       └── logger.js     # نظام السجلات
-├── appstate.json         # كوكيز فيسبوك
+├── manual-appstate.json  # احتياطي محلي، لا يكتبه البوت
 └── config.json           # إعدادات البوت
 ```
 
