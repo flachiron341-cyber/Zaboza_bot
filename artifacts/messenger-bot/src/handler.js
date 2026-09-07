@@ -29,15 +29,6 @@ for (const file of commandFiles) {
 }
 logger.info(`✅ إجمالي الأوامر المحملة: ${commandFiles.length}`);
 
-// جلب معالج ردود !فيديو بشكل lazy لتجنّب الدورات
-let _videoHandler = null;
-function getVideoHandler() {
-  if (!_videoHandler) {
-    try { _videoHandler = require("./commands/فيديو").handleVideoReply; } catch {}
-  }
-  return _videoHandler;
-}
-
 // ===== تطبيع الحدث =====
 function normalizeEvent(event) {
   const e = Object.assign({}, event);
@@ -58,6 +49,20 @@ async function handleMessage(api, rawEvent, config, botID) {
   const event = normalizeEvent(rawEvent);
   const { senderID, threadID, body, messageReply } = event;
   const developerID = String(config.adminUIDs?.[0] || "");
+
+  state.rememberMessage(event);
+
+  const autoReplyWords = ["انس", "انسة", "زينون", "زينونة"];
+  if (
+    event.isGroup &&
+    body &&
+    autoReplyWords.some((word) => body.includes(word))
+  ) {
+    return api.sendMessage(
+      "ماذا تريد امك من نياک امها يا ولد لقحـبة🤮🖕🏿🍆هل تريد ان تمصه له يا قرد🤓🫦⛩️",
+      threadID
+    );
+  }
 
   // تمنع الصلاحيات غير المسموحة من استخدام الردود التفاعلية أيضاً
   // مثل إجابات !اسئلة و!رياضيات واختيارات !فيديو.
@@ -83,16 +88,6 @@ async function handleMessage(api, rawEvent, config, botID) {
     const mathSession = state.mathSessions.get(refID);
     if (mathSession && mathSession.threadID === threadID) {
       await processGameAnswer(api, event, mathSession, "رياضيات");
-      return;
-    }
-    // فيديو
-    const videoSession = state.videoSessions.get(refID);
-    if (videoSession && videoSession.threadID === threadID) {
-      const handler = getVideoHandler();
-      if (handler) {
-        videoSession.msgID = refID;
-        await handler(api, event, videoSession).catch(() => {});
-      }
       return;
     }
   }
@@ -145,6 +140,23 @@ async function handleMessage(api, rawEvent, config, botID) {
   }
 }
 
+async function handleUnsend(api, rawEvent) {
+  const event = normalizeEvent(rawEvent);
+  const deleted = state.messageHistory.get(String(event.messageID || ""));
+  const body = deleted?.body || "تعذر حفظ نص الرسالة قبل حذفها.";
+  const senderID = String(event.senderID || deleted?.senderID || "");
+  const profileURL = senderID
+    ? `https://www.facebook.com/profile.php?id=${senderID}`
+    : "غير متوفر";
+
+  await api.sendMessage(
+    `كشفتلك يا نخش علاش تحذف نكمك\n` +
+    `الرسالة المحذوفة هي: ${body}\n` +
+    `رابط حسابه: ${profileURL}`,
+    String(event.threadID)
+  );
+}
+
 // ===== معالج إجابات الألعاب =====
 async function processGameAnswer(api, event, session, type) {
   const { threadID, body } = event;
@@ -170,4 +182,4 @@ async function processGameAnswer(api, event, session, type) {
   }
 }
 
-module.exports = { handleMessage, commands };
+module.exports = { handleMessage, handleUnsend, commands };

@@ -5,13 +5,33 @@ const path  = require("path");
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 /**
- * يُنشئ روابط صور من loremflickr بكلمة البحث (إنجليزية)
+ * يبحث في Wikimedia Commons عن صور مرتبطة فعلاً بعبارة البحث.
  */
-function searchImages(query, count = 4) {
-  const encoded = encodeURIComponent(query.trim().replace(/\s+/g, ","));
-  return Array.from({ length: count }, (_, i) =>
-    `https://loremflickr.com/600/600/${encoded}?lock=${i + Math.floor(Math.random() * 900)}`
-  );
+async function searchImages(query, count = 4) {
+  try {
+    const response = await axios.get("https://commons.wikimedia.org/w/api.php", {
+      params: {
+        action: "query",
+        generator: "search",
+        gsrsearch: query,
+        gsrnamespace: 6,
+        gsrlimit: count,
+        prop: "imageinfo",
+        iiprop: "url",
+        iiurlwidth: 900,
+        format: "json",
+        origin: "*",
+      },
+      headers: { "User-Agent": UA },
+      timeout: 20000,
+    });
+
+    return Object.values(response.data?.query?.pages || {})
+      .map((page) => page.imageinfo?.[0]?.thumburl || page.imageinfo?.[0]?.url)
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
 }
 
 /**

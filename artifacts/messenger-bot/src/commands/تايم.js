@@ -52,6 +52,7 @@ module.exports = {
     max = Math.max(1, Math.min(540, max));
 
     state.attackDelay.set(threadID, { min, max });
+    state.persistAttackDelay(threadID);
 
     const display = min === max ? `${min} ثانية` : `${min}_${max} ثانية`;
     await api.sendMessage(`✅ تم ضبط تأخير الاتاك على: ${display}`, threadID);

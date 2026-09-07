@@ -11,6 +11,7 @@ const { parseCookieString } = require("./utils/parseCookies");
 const appstateSecretName = "FACEBOOK_APPSTATE";
 const appstatePath = path.join(__dirname, "../appstate.json");
 const cookiesTxtPath = path.join(__dirname, "../cookies.txt");
+const groupEventImageDir = path.join(__dirname, "../assets/events");
 
 // ===== تحميل الكوكيز =====
 function isUsableAppState(data) {
@@ -96,6 +97,18 @@ const MAX_RETRY_DELAY_MS = 5 * 60 * 1000;
 let retryTimer = null;
 let loginInProgress = false;
 let activeAPI = null;
+
+function sendGroupEventImage(api, threadID, filename) {
+  const imagePath = path.join(groupEventImageDir, filename);
+  if (!fs.existsSync(imagePath)) {
+    logger.warn(`صورة حدث القروب غير موجودة: ${filename}`);
+    return;
+  }
+  api.sendMessage(
+    { attachment: fs.createReadStream(imagePath) },
+    threadID
+  ).catch((error) => logger.error(`فشل إرسال صورة حدث القروب: ${error.message}`));
+}
 
 function scheduleLogin(attempt = 1, overrideDelay = null) {
   if (retryTimer || loginInProgress) return;
@@ -183,6 +196,12 @@ function startBot(api) {
       });
     }
 
+    if (event.type === "message_unsend") {
+      handler.handleUnsend(api, event).catch((e) => {
+        logger.error("خطأ في كشف الرسالة المحذوفة: " + e.message);
+      });
+    }
+
     if (event.type === "event") {
       handleGroupEvent(api, event);
     }
@@ -191,6 +210,50 @@ function startBot(api) {
   function handleGroupEvent(api, event) {
     const threadID       = String(event.threadID || "");
     const logMessageType = event.logMessageType;
+
+    if (logMessageType === "log:unsubscribe") {
+      sendGroupEventImage(api, threadID, "1788550124005.jpg");
+    }
+    if (logMessageType === "log:subscribe") {
+      sendGroupEventImage(api, threadID, "1788550142034.jpg");
+    }
+
+    const nicknameProtection = state.nicknameProtectionState.get(threadID);
+
+    if (nicknameProtection?.active && logMessageType === "log:subscribe") {
+      const added = event.logMessageData?.addedParticipants || [];
+      for (const participant of added) {
+        const uid = String(
+          typeof participant === "object"
+            ? participant.userFbId || participant.userID || participant.id || ""
+            : participant
+        );
+        if (uid) nicknameProtection.nicknames.set(uid, "");
+      }
+      state.persistNicknameProtection(threadID);
+    }
+
+    if (nicknameProtection?.active && logMessageType === "log:unsubscribe") {
+      const uid = String(event.logMessageData?.leftParticipantFbId || "");
+      if (uid) {
+        nicknameProtection.nicknames.delete(uid);
+        state.persistNicknameProtection(threadID);
+      }
+    }
+
+    if (nicknameProtection?.active && logMessageType === "log:user-nickname") {
+      const changedUID = String(event.logMessageData?.participant_id || "");
+      if (changedUID && nicknameProtection.nicknames.has(changedUID)) {
+        const savedNick = nicknameProtection.nicknames.get(changedUID) || "";
+        logger.info(`🛡 إعادة كنية ${changedUID} إلى "${savedNick}"`);
+        setTimeout(() => {
+          api.setNickname(savedNick, threadID, changedUID, (err) => {
+            if (!err) logger.info(`✅ أُعيدت كنية ${changedUID}`);
+          });
+        }, 500);
+      }
+    }
+
     const protection     = state.protectionState.get(threadID);
     if (!protection || !protection.active) return;
 

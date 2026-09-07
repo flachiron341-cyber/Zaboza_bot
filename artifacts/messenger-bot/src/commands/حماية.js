@@ -18,7 +18,7 @@ module.exports = {
       if (!state.protectionState.get(threadID)?.active) {
         return api.sendMessage("⚠️ الحماية غير مفعّلة أصلاً.", threadID);
       }
-      state.protectionState.delete(threadID);
+      state.removeGroupProtection(threadID);
       return api.sendMessage("🔓 تم إيقاف الحماية.", threadID);
     }
 
@@ -46,6 +46,7 @@ module.exports = {
       name:   currentName,
       nicknames,
     });
+    state.persistGroupProtection(threadID);
 
     await api.sendMessage(
       [

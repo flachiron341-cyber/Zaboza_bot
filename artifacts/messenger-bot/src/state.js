@@ -1,6 +1,36 @@
 /**
  * الحالة المشتركة بين الأوامر
  */
+const persistentState = require("./utils/persistentState");
+const savedState = persistentState.readState();
+
+const attackDelay = new Map(
+  Object.entries(savedState.attackDelays || {}).map(([threadID, delay]) => [
+    String(threadID),
+    { min: Number(delay.min), max: Number(delay.max) },
+  ])
+);
+
+const protectionState = new Map();
+for (const [threadID, entry] of Object.entries(savedState.groupProtections || {})) {
+  const nicknames = new Map(
+    Object.entries(entry?.nicknames || {}).map(([uid, nickname]) => [String(uid), nickname ?? ""])
+  );
+  protectionState.set(String(threadID), {
+    active: true,
+    name: String(entry?.name || ""),
+    nicknames,
+  });
+}
+
+const nicknameProtectionState = new Map();
+for (const [threadID, entry] of Object.entries(savedState.nicknameProtections || {})) {
+  const nicknames = new Map(
+    Object.entries(entry?.nicknames || {}).map(([uid, nickname]) => [String(uid), nickname ?? ""])
+  );
+  nicknameProtectionState.set(String(threadID), { active: true, nicknames });
+}
+
 module.exports = {
   // جلسات أمر !اسئلة  —  key: messageID, value: { msgID, answer, threadID, timer }
   gameSessions: new Map(),
@@ -12,11 +42,54 @@ module.exports = {
   attackState: new Map(),
 
   // تأخير الاتاك لكل قروب — key: threadID, value: { min, max } بالثواني
-  attackDelay: new Map(),
+  attackDelay,
 
   // حماية اسم القروب والكنيات — key: threadID, value: { active, name, nicknames: Map }
-  protectionState: new Map(),
+  protectionState,
 
-  // جلسات أمر !فيديو — key: threadID, value: { step, category, expiry }
-  videoSessions: new Map(),
+  // حماية الكنيات فقط — تحفظ بعد إعادة تشغيل البوت.
+  nicknameProtectionState,
+
+  // الرسائل الحديثة اللازمة لاكتشاف الرسائل المحذوفة.
+  messageHistory: new Map(),
+
+  rememberMessage(event) {
+    const messageID = String(event?.messageID || "");
+    if (!messageID) return;
+    this.messageHistory.set(messageID, {
+      body: String(event.body || ""),
+      senderID: String(event.senderID || ""),
+      threadID: String(event.threadID || ""),
+      timestamp: event.timestamp || Date.now(),
+    });
+    while (this.messageHistory.size > 1000) {
+      this.messageHistory.delete(this.messageHistory.keys().next().value);
+    }
+  },
+
+  persistNicknameProtection(threadID) {
+    const entry = this.nicknameProtectionState.get(String(threadID));
+    if (!entry) return;
+    persistentState.saveNicknameProtection(String(threadID), entry.nicknames);
+  },
+
+  removeNicknameProtection(threadID) {
+    this.nicknameProtectionState.delete(String(threadID));
+    persistentState.removeNicknameProtection(String(threadID));
+  },
+
+  persistAttackDelay(threadID) {
+    const delay = this.attackDelay.get(String(threadID));
+    if (delay) persistentState.saveAttackDelay(String(threadID), delay);
+  },
+
+  persistGroupProtection(threadID) {
+    const protection = this.protectionState.get(String(threadID));
+    if (protection) persistentState.saveGroupProtection(String(threadID), protection);
+  },
+
+  removeGroupProtection(threadID) {
+    this.protectionState.delete(String(threadID));
+    persistentState.removeGroupProtection(String(threadID));
+  },
 };

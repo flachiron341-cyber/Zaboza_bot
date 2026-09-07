@@ -27,7 +27,7 @@ module.exports = {
     await api.sendMessage(`🔍 جاري البحث عن صور "${arabicQuery}"...`, threadID);
 
     // ننشئ 4 روابط بـ seeds مختلفة
-    const urls       = searchImages(engQuery, 4);
+    const urls       = await searchImages(engQuery, 4);
     const validPaths = [];
 
     for (const url of urls) {

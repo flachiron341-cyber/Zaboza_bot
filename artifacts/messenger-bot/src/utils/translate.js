@@ -1,11 +1,11 @@
 /**
  * قاموس عربي→إنجليزي لكلمات البحث الشائعة في الصور
- * يُستخدم في أمر !صورة لتحسين نتائج loremflickr
+ * يُستخدم في أمر !صورة لتحسين نتائج البحث
  */
 const DICT = {
   // رياضة
   "ميسي": "messi soccer football",
-  "رونالدو": "ronaldo soccer football",
+  "رونالدو": "Cristiano Ronaldo Real Madrid",
   "كرة": "football soccer",
   "كرة قدم": "football soccer",
   "كرة السلة": "basketball",
@@ -68,6 +68,7 @@ const DICT = {
 
   // شخصيات وترفيه
   "انمي": "anime",
+  "ايتاتشي": "Itachi Uchiha Naruto",
   "ديزني": "disney cartoon",
   "سوبر هيرو": "superhero",
 

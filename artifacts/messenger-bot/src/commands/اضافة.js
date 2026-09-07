@@ -1,12 +1,10 @@
-const { downloadImage } = require("../utils/images");
 const fs = require("fs");
+const path = require("path");
 
-const WELCOME_TAGS = [
-  "celebration,party,happy",
-  "welcome,party,colorful",
-  "confetti,celebration",
-  "party,balloons,happy",
-];
+const WELCOME_IMAGE_PATH = path.join(
+  __dirname,
+  "../../assets/events/1788550142034.jpg"
+);
 
 module.exports = {
   config: {
@@ -79,18 +77,16 @@ module.exports = {
       return api.sendMessage(`❌ فشلت الإضافة: ${errMsg}`, threadID);
     }
 
-    // إرسال صورة ترحيب
-    const tag = WELCOME_TAGS[Math.floor(Math.random() * WELCOME_TAGS.length)];
-    const url = `https://loremflickr.com/600/600/${tag}?lock=${Math.floor(Math.random() * 999) + 1}`;
-    const tmp = await downloadImage(url);
     const body = `🎉 مرحباً بـ ${targetID} في القروب! يسعدنا وجودك معنا 🥳`;
 
-    if (tmp) {
+    if (fs.existsSync(WELCOME_IMAGE_PATH)) {
       try {
-        await api.sendMessage({ body, attachment: fs.createReadStream(tmp) }, threadID);
+        await api.sendMessage(
+          { body, attachment: fs.createReadStream(WELCOME_IMAGE_PATH) },
+          threadID
+        );
         return;
       } catch {}
-      finally { fs.unlink(tmp, () => {}); }
     }
 
     await api.sendMessage(body, threadID);

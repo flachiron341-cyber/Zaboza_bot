@@ -1,3 +1,5 @@
+const state = require("../state");
+
 module.exports = {
   config: {
     name: "كين",
@@ -44,10 +46,16 @@ async function applyNickname(api, threadID, nickname) {
     return api.sendMessage("⚠️ لا يوجد أعضاء في القروب.", threadID);
   }
 
+  const nicknameProtection = state.nicknameProtectionState.get(threadID);
+  if (nicknameProtection) {
+    for (const uid of participants) nicknameProtection.nicknames.set(uid, nickname);
+    state.persistNicknameProtection(threadID);
+  }
+
   let done = 0;
   let failed = 0;
 
-  // معالجة متسلسلة مع تأخير 800ms بين كل طلب لتجنّب حظر فيسبوك
+  // تنفيذ جميع الأعضاء، بما في ذلك المسؤولون، ثم إرسال التأكيد النهائي.
   for (const uid of participants) {
     try {
       // api.setNickname هو الاسم الصحيح في ws3-fca
@@ -61,12 +69,15 @@ async function applyNickname(api, threadID, nickname) {
     } catch {
       failed++;
     }
-    await new Promise((r) => setTimeout(r, 800));
+    await new Promise((r) => setTimeout(r, 250));
   }
 
   const icon = nickname ? "✅" : "🔄";
+  const resultText = nickname
+    ? `تم تغيير كنيات كل الاعضاء إلى "${nickname}"`
+    : "تم حذف كنيات كل الاعضاء";
   await api.sendMessage(
-    `${icon} ${label}\n✔ نجح: ${done} | ✖ فشل: ${failed}`,
+    `${icon} ${resultText}\n✔ نجح: ${done} | ✖ فشل: ${failed}`,
     threadID
   );
 }

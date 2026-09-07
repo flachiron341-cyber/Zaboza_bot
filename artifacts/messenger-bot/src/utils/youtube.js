@@ -99,4 +99,47 @@ async function downloadYoutubeVideo(url, maxDuration = 60) {
   }
 }
 
-module.exports = { searchYoutube, downloadYoutubeVideo };
+async function downloadYoutubeAudio(url, maxDuration = 600) {
+  const tmpIn = path.join("/tmp", `yt_audio_in_${Date.now()}.webm`);
+  const tmpOut = path.join("/tmp", `yt_audio_out_${Date.now()}.mp3`);
+
+  try {
+    const info = await ytdl.getInfo(url);
+    const format = ytdl.chooseFormat(info.formats, {
+      quality: "highestaudio",
+      filter: "audioonly",
+    });
+    if (!format) return null;
+
+    await new Promise((resolve, reject) => {
+      const stream = ytdl.downloadFromInfo(info, { format });
+      const out = fs.createWriteStream(tmpIn);
+      stream.pipe(out);
+      stream.on("error", reject);
+      out.on("finish", resolve);
+      out.on("error", reject);
+      setTimeout(() => reject(new Error("timeout")), 120000);
+    });
+
+    await new Promise((resolve, reject) => {
+      ffmpeg(tmpIn)
+        .setStartTime(0)
+        .setDuration(maxDuration)
+        .audioCodec("libmp3lame")
+        .audioBitrate("128k")
+        .format("mp3")
+        .on("end", resolve)
+        .on("error", reject)
+        .save(tmpOut);
+    });
+
+    fs.unlink(tmpIn, () => {});
+    return tmpOut;
+  } catch {
+    try { fs.unlink(tmpIn, () => {}); } catch {}
+    try { fs.unlink(tmpOut, () => {}); } catch {}
+    return null;
+  }
+}
+
+module.exports = { searchYoutube, downloadYoutubeVideo, downloadYoutubeAudio };

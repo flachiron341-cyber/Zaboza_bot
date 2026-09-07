@@ -1,101 +1,139 @@
-// ═══════════════════════════════════════
-//  أمر: مساعدة  —  قائمة الأوامر المنسّقة
-// ═══════════════════════════════════════
+const fs = require("fs");
+const path = require("path");
 
-const W = 28;
+const menuImagePath = path.join(__dirname, "../../assets/menu.jpg");
+const WIDTH = 34;
 
-function pad(str, width) {
-  const s = String(str ?? "");
-  const len = [...s].length;
-  return s + " ".repeat(Math.max(0, width - len));
+const CATEGORIES = {
+  عام: {
+    icon: "✨",
+    items: [
+      ["بينغ", "قياس سرعة استجابة البوت"],
+      ["معلومات", "معلومات البوت"],
+      ["uid", "عرض معرّف حسابك"],
+      ["مساعدة", "قائمة المجالات والأوامر"],
+    ],
+  },
+  القروب: {
+    icon: "👥",
+    items: [
+      ["كين", "تغيير كنيات كل الأعضاء"],
+      ["كين_حماية", "حماية الكنيات من التغيير"],
+      ["كين_حماية_ايقاف", "إيقاف حماية الكنيات"],
+      ["نيم", "تغيير اسم القروب"],
+      ["حماية", "حماية اسم القروب والكنيات القديمة"],
+      ["مجموعة", "إنشاء مجموعة مع شخص بالرد عليه"],
+      ["استحواذ", "ترك البوت المسؤول الوحيد"],
+      ["مغادرة", "إخراج البوت من القروب"],
+      ["اضافة", "إضافة عضو للقروب"],
+      ["طرد", "طرد عضو من القروب"],
+      ["استخدام", "تحديد من يستخدم البوت"],
+    ],
+  },
+  الترفيه: {
+    icon: "🎭",
+    items: [
+      ["قبلة", "إرسال صورة قبلة"],
+      ["زواج", "إرسال صورة زواج"],
+      ["طلاق", "إرسال صورة طلاق"],
+      ["سجن", "إرسال سجن"],
+      ["مدح", "مدح عضو"],
+      ["قول", "تحويل النص إلى صوت"],
+      ["نرد", "رمي النرد"],
+      ["صورة", "بحث دقيق عن صورة"],
+      ["اغنية", "إرسال أغنية كرسالة صوتية"],
+      ["حذف", "حذف رسالة البوت بالرد عليها"],
+    ],
+  },
+  الألعاب: {
+    icon: "🧠",
+    items: [
+      ["اسئلة", "أسئلة ثقافية"],
+      ["رياضيات", "مسائل رياضية"],
+    ],
+  },
+  الاتاك: {
+    icon: "⚡",
+    items: [
+      ["اتاك", "إرسال رسالة متكررة"],
+      ["تايم", "تعيين مدة ثابتة أو نطاق"],
+    ],
+  },
+  الإعدادات: {
+    icon: "⚙️",
+    items: [
+      ["وضع", "حفظ صورة قائمة الأوامر"],
+      ["تايم", "تعيين توقيت الاتاك"],
+    ],
+  },
+};
+
+function fit(text) {
+  const chars = [...String(text)];
+  return chars.length > WIDTH ? chars.slice(0, WIDTH - 1).join("") + "…" : chars.join("") + " ".repeat(Math.max(0, WIDTH - chars.length));
 }
 
-function trunc(str, max) {
-  const s = String(str ?? "");
-  return [...s].length > max ? [...s].slice(0, max - 1).join("") + "…" : s;
-}
-
-function row(content) {
-  return `║ ${pad(content, W)} ║`;
-}
-
-const SEP  = `╠${"═".repeat(W + 2)}╣`;
-const BLANK = `║ ${" ".repeat(W)} ║`;
-
-function section(icon, title, items) {
+function renderCategory(prefix, name, category) {
   const lines = [
-    SEP,
-    row(`${icon} ${title}`),
-    SEP,
+    `╔${"═".repeat(WIDTH + 4)}╗`,
+    `║  ${fit(`${category.icon} ${name}`)}  ║`,
+    `╠${"═".repeat(WIDTH + 4)}╣`,
   ];
-  for (const [cmd, desc] of items) {
-    lines.push(row(`!${pad(cmd, 10)} ${trunc(desc, W - 12)}`));
+
+  for (const [command, description] of category.items) {
+    lines.push(`║  ${fit(`${prefix}${command}  —  ${description}`)}  ║`);
   }
-  return lines;
+
+  lines.push(`╚${"═".repeat(WIDTH + 4)}╝`);
+  return lines.join("\n");
 }
 
 module.exports = {
   config: {
     name: "مساعدة",
     aliases: ["help", "cmds", "اوامر"],
-    description: "يعرض قائمة كل الأوامر المتاحة",
-    usage: "!مساعدة",
+    description: "يعرض المجالات أو أوامر مجال محدد",
+    usage: "!مساعدة | !مساعدة القروب",
     cooldown: 5,
     adminOnly: false,
   },
 
-  async run({ api, event, config }) {
+  async run({ api, event, args, config }) {
     const threadID = String(event.threadID);
-    const p = config.prefix;
+    const prefix = config.prefix;
+    const requested = args.join(" ").trim().toLowerCase();
+    const categoryName = Object.keys(CATEGORIES).find(
+      (name) => name.toLowerCase() === requested
+    );
 
-    const lines = [
-      `╔${"═".repeat(W + 2)}╗`,
-      row(`🤖  zaboza bot — الأوامر`),
-      row(`📌 البادئة: ${p}   |  19 أمر`),
-      `╠${"═".repeat(W + 2)}╣`,
-      ...section("📋", "عام", [
-        ["بينغ",    "قياس سرعة الاستجابة"],
-        ["معلومات", "معلومات عن البوت"],
-        ["uid",     "عرض ID حسابك"],
-        ["تايم",    "تأخير ثابت أو عشوائي"],
-        ["مساعدة",  "قائمة الأوامر"],
-      ]),
-      BLANK,
-      ...section("👥", "القروب", [
-        ["استخدام", "تحديد مستخدمي البوت"],
-        ["نيم",     "تغيير اسم القروب"],
-        ["كين",     "تغيير كنيات الأعضاء"],
-        ["حماية",   "حماية اسم القروب"],
-        ["طرد",     "طرد عضو (مطور فقط)"],
-        ["اضافة",   "إضافة عضو (مطور فقط)"],
-      ]),
-      BLANK,
-      ...section("📣", "الاتاك", [
-        ["اتاك",    "إرسال رسالة متكررة"],
-        ["تايم",    "ثابت أو نطاق مثل 15_30"],
-      ]),
-      BLANK,
-      ...section("🎭", "الترفيه", [
-        ["قبلة",    "يرسل صورة قبلة 💋"],
-        ["زواج",    "يرسل صورة زواج 💍"],
-        ["طلاق",    "يرسل صورة طلاق 💔"],
-        ["سجن",     "يضع شخص في السجن 🔒"],
-        ["مدح",     "يمدح شخص بكلام جميل"],
-        ["صورة",    "يبحث ويرسل صور 🖼️"],
-        ["قول",     "يحوّل نص لصوت 🎙️"],
-        ["نرد",     "يرمي نرداً عشوائياً"],
-        ["فيديو",   "يجلب فيديو من يوتيوب"],
-      ]),
-      BLANK,
-      ...section("🧠", "الألعاب", [
-        ["اسئلة",   "أسئلة ثقافية 30 ثانية"],
-        ["رياضيات", "مسائل رياضيات 30 ثانية"],
-      ]),
-      `╚${"═".repeat(W + 2)}╝`,
-      ``,
-      `💡 مثال: ${p}صورة ميسي | ${p}قول مرحبا`,
-    ];
+    let text;
+    if (categoryName) {
+      text =
+        `🤖 ${config.botName}\n` +
+        `╰─ قائمة مجال ${categoryName}\n\n` +
+        renderCategory(prefix, categoryName, CATEGORIES[categoryName]);
+    } else if (requested) {
+      text = `❌ المجال غير موجود.\nالمجالات المتاحة: ${Object.keys(CATEGORIES).join("، ")}`;
+    } else {
+      text = [
+        `╔${"═".repeat(WIDTH + 4)}╗`,
+        `║  ${fit(`🤖 ${config.botName} — المجالات`)}  ║`,
+        `╠${"═".repeat(WIDTH + 4)}╣`,
+        ...Object.entries(CATEGORIES).map(
+          ([name, category]) => `║  ${fit(`${category.icon} ${name}  →  !مساعدة ${name}`)}  ║`
+        ),
+        `╠${"═".repeat(WIDTH + 4)}╣`,
+        `║  ${fit("اختر مجالاً لعرض أوامره بالتفصيل")}  ║`,
+        `╚${"═".repeat(WIDTH + 4)}╝`,
+      ].join("\n");
+    }
 
-    await api.sendMessage(lines.join("\n"), threadID);
+    if (fs.existsSync(menuImagePath)) {
+      return api.sendMessage(
+        { body: text, attachment: fs.createReadStream(menuImagePath) },
+        threadID
+      );
+    }
+    return api.sendMessage(text, threadID);
   },
 };
