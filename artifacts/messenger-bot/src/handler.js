@@ -2,6 +2,7 @@ const fs   = require("fs");
 const path = require("path");
 const logger = require("./utils/logger");
 const state  = require("./state");
+const usageAccess = require("./utils/usageAccess");
 
 // ===== تحميل الأوامر =====
 const commands = new Map();
@@ -56,6 +57,17 @@ function normalizeEvent(event) {
 async function handleMessage(api, rawEvent, config, botID) {
   const event = normalizeEvent(rawEvent);
   const { senderID, threadID, body, messageReply } = event;
+  const developerID = String(config.adminUIDs?.[0] || "");
+
+  // تمنع الصلاحيات غير المسموحة من استخدام الردود التفاعلية أيضاً
+  // مثل إجابات !اسئلة و!رياضيات واختيارات !فيديو.
+  if (
+    messageReply &&
+    body &&
+    !usageAccess.isAllowed(threadID, senderID, developerID)
+  ) {
+    return;
+  }
 
   // ── إجابات الألعاب (يجب أن يكون رداً على رسالة البوت) ──
   if (messageReply && body) {
@@ -93,6 +105,15 @@ async function handleMessage(api, rawEvent, config, botID) {
   if (!commands.has(commandName)) return;
 
   const command = commands.get(commandName);
+
+  // صلاحية استخدام البوت حسب إعداد هذا القروب.
+  if (!usageAccess.isAllowed(threadID, senderID, developerID)) {
+    return api.sendMessage(
+      "🚫 لا تملك صلاحية استخدام البوت في هذا القروب.\n" +
+      "📌 اطلب من المطور تفعيلك بأمر !استخدام بالرد على رسالتك.",
+      threadID
+    );
+  }
 
   // صلاحيات الأدمن
   if (command.config.adminOnly && !config.adminUIDs.includes(senderID)) {

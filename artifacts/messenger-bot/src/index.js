@@ -9,11 +9,25 @@ const { parseCookieString } = require("./utils/parseCookies");
 
 // ===== مسارات الملفات =====
 const appstatePath  = path.join(__dirname, "../appstate.json");
+const manualAppstatePath = path.join(__dirname, "../manual-appstate.json");
 const cookiesTxtPath = path.join(__dirname, "../cookies.txt");
 
 // ===== تحميل الكوكيز =====
 function loadAppState() {
-  // ── محاولة 1: قراءة cookies.txt إذا تم تحديثه مؤخراً أو appstate.json فارغ ──
+  // ── المصدر الأساسي: ملف يدوي لا يكتبه البوت ولا أي كود داخلي ──
+  if (fs.existsSync(manualAppstatePath)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(manualAppstatePath, "utf-8"));
+      if (Array.isArray(data) && data.length > 0) {
+        logger.info(`🍪 قُرئت ${data.length} كوكي من manual-appstate.json`);
+        return data;
+      }
+    } catch (e) {
+      logger.error("⚠️ فشل قراءة manual-appstate.json: " + e.message);
+    }
+  }
+
+  // ── محاولة 2: قراءة cookies.txt (يدوية فقط، بدون أي كتابة) ──
   if (fs.existsSync(cookiesTxtPath)) {
     try {
       const raw = fs.readFileSync(cookiesTxtPath, "utf-8");
@@ -36,7 +50,7 @@ function loadAppState() {
     }
   }
 
-  // ── محاولة 2: appstate.json ──
+  // ── محاولة 3: appstate.json القديم ──
   if (fs.existsSync(appstatePath)) {
     try {
       const raw  = fs.readFileSync(appstatePath, "utf-8");
