@@ -9,7 +9,7 @@ const { parseCookieString } = require("./utils/parseCookies");
 
 // ===== مسارات الملفات =====
 const appstateSecretName = "FACEBOOK_APPSTATE";
-const manualAppstatePath = path.join(__dirname, "../manual-appstate.json");
+const appstatePath = path.join(__dirname, "../appstate.json");
 const cookiesTxtPath = path.join(__dirname, "../cookies.txt");
 
 // ===== تحميل الكوكيز =====
@@ -38,7 +38,21 @@ function parseAppStateSecret(rawValue) {
 }
 
 function loadAppState() {
-  // ── المصدر الأساسي: سر Replit لا يظهر محتواه في السجلات ──
+  // ── المصدر الأساسي: ملف يدوي يمكن تبديله بسهولة بين الحسابات ──
+  if (fs.existsSync(appstatePath)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(appstatePath, "utf-8"));
+      if (isUsableAppState(data)) {
+        logger.info(`🍪 قُرئت ${data.length} كوكي من appstate.json`);
+        return data;
+      }
+      logger.error("⚠️ appstate.json لا يحتوي c_user و xs.");
+    } catch (e) {
+      logger.error("⚠️ فشل قراءة appstate.json: " + e.message);
+    }
+  }
+
+  // ── الاحتياطي: سر Replit لا يظهر محتواه في السجلات ──
   const secretValue = process.env[appstateSecretName];
   if (secretValue) {
     const secretAppstate = parseAppStateSecret(secretValue);
@@ -49,20 +63,7 @@ function loadAppState() {
     logger.error(`⚠️ سر ${appstateSecretName} لا يحتوي appstate صالحاً.`);
   }
 
-  // ── المصدر الاحتياطي: ملف يدوي لا يكتبه البوت ولا أي كود داخلي ──
-  if (fs.existsSync(manualAppstatePath)) {
-    try {
-      const data = JSON.parse(fs.readFileSync(manualAppstatePath, "utf-8"));
-      if (isUsableAppState(data)) {
-        logger.info(`🍪 قُرئت ${data.length} كوكي من manual-appstate.json`);
-        return data;
-      }
-      logger.error("⚠️ manual-appstate.json لا يحتوي c_user و xs.");
-    } catch (e) {
-      logger.error("⚠️ فشل قراءة manual-appstate.json: " + e.message);
-    }
-  }
-
+  // ── احتياطي إضافي: Cookie header يدوي ──
   // ── محاولة 2: قراءة cookies.txt (يدوية فقط، بدون أي كتابة) ──
   if (fs.existsSync(cookiesTxtPath)) {
     try {
@@ -116,7 +117,7 @@ function startLogin(attempt = 1) {
   if (!appstate) {
     loginInProgress = false;
     logger.error(
-      `❌ لا يوجد كوكيز صالح في ${appstateSecretName} أو manual-appstate.json.\n` +
+      `❌ لا يوجد كوكيز صالح في appstate.json أو ${appstateSecretName}.\n` +
       "   ضع تصدير المتصفح في cookies.txt ثم شغّل مثبت الكوكيز."
     );
     scheduleLogin(attempt + 1);

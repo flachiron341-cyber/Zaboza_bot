@@ -2,7 +2,7 @@
 
 /*
  * مثبت الكوكيز:
- * يحوّل تصدير المتصفح JSON أو Cookie header إلى manual-appstate.json.
+ * يحوّل تصدير المتصفح JSON أو Cookie header إلى appstate.json.
  *
  * الاستخدام:
  *   pnpm run fix-cookies -- cookies-export.json
@@ -14,7 +14,7 @@ const path = require("path");
 
 const root = path.join(__dirname, "..");
 const inputPath = path.resolve(process.argv[2] || path.join(root, "cookies.txt"));
-const outputPath = path.join(root, "manual-appstate.json");
+const outputPath = path.join(root, "appstate.json");
 
 function makeCookie(raw) {
   const key = String(raw?.key || raw?.name || "").trim();
@@ -90,7 +90,7 @@ if (!fs.existsSync(inputPath)) {
     fs.writeFileSync(tempPath, JSON.stringify(cookies, null, 2), { mode: 0o600 });
     fs.renameSync(tempPath, outputPath);
     try { fs.chmodSync(outputPath, 0o600); } catch {}
-    console.log(`✅ تم تثبيت ${cookies.length} كوكيز في manual-appstate.json`);
+    console.log(`✅ تم تثبيت ${cookies.length} كوكيز في appstate.json`);
     console.log("🔒 الملف اليدوي هو مصدر البوت ولن يغيّره البوت أثناء التشغيل.");
   }
 }
