@@ -11,7 +11,7 @@ module.exports = {
   },
 
   async run({ api, event, args }) {
-    const { threadID } = event;
+    const threadID = String(event.threadID);
 
     // ── إيقاف الاتاك ──
     if (args[0] === "ايقاف" || args[0] === "stop") {
@@ -19,7 +19,7 @@ module.exports = {
       if (!current || !current.active) {
         return api.sendMessage("⚠️ لا يوجد اتاك نشط حالياً.", threadID);
       }
-      clearInterval(current.interval);
+      if (current.timeout) clearTimeout(current.timeout);
       state.attackState.delete(threadID);
       return api.sendMessage("✅ تم إيقاف الاتاك.", threadID);
     }
@@ -40,22 +40,50 @@ module.exports = {
     }
 
     const message = args.join(" ");
-    const delay = state.attackDelay.get(threadID) || 5000; // افتراضي 5 ثواني
+    const configured = state.attackDelay.get(threadID) || { min: 5, max: 5 };
+    const min = Number(configured.min);
+    const max = Number(configured.max);
 
-    api.sendMessage(
-      `✅ بدأ الاتاك!\n📨 الرسالة: "${message}"\n⏱ كل ${delay / 1000} ثانية\n\n🛑 لإيقافه: !اتاك ايقاف`,
+    await api.sendMessage(
+      `✅ بدأ الاتاك!\n📨 الرسالة: "${message}"\n` +
+      `⏱ كل ${min === max ? `${min} ثانية` : `مدة عشوائية بين ${min} و${max} ثانية`}\n\n` +
+      `🛑 لإيقافه: !اتاك ايقاف`,
       threadID
     );
 
-    const interval = setInterval(() => {
+    const randomDelay = () => {
+      const seconds = min === max
+        ? min
+        : Math.floor(Math.random() * (max - min + 1)) + min;
+      return seconds * 1000;
+    };
+
+    const scheduleNext = () => {
       const s = state.attackState.get(threadID);
       if (!s || !s.active) {
-        clearInterval(interval);
         return;
       }
-      api.sendMessage(message, threadID);
-    }, delay);
 
-    state.attackState.set(threadID, { active: true, interval, message });
+      s.timeout = setTimeout(async () => {
+        const current = state.attackState.get(threadID);
+        if (!current || !current.active) return;
+
+        try {
+          await api.sendMessage(message, threadID);
+        } catch {}
+
+        // يتم اختيار مدة جديدة بعد كل رسالة.
+        scheduleNext();
+      }, randomDelay());
+    };
+
+    state.attackState.set(threadID, {
+      active: true,
+      timeout: null,
+      message,
+      min,
+      max,
+    });
+    scheduleNext();
   },
 };

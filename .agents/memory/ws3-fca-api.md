@@ -34,3 +34,4 @@ ws3-fca أحياناً يُعيد IDs كـ String objects (ليس primitive stri
 
 ## appstate.json
 يجب أن يكون في .gitignore — يحتوي كوكيز جلسة فيسبوك.
+ملف الجلسة في هذا المشروع للقراءة فقط؛ لا تحفظ نسخة `api.getAppState()` تلقائياً ولا تعدّل الملف عند التشغيل.

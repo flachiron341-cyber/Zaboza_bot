@@ -27,8 +27,7 @@ function loadAppState() {
         const parsed = parseCookieString(cookieLine);
         if (parsed.length > 0) {
           logger.info(`🍪 قُرئت ${parsed.length} كوكي من cookies.txt`);
-          // احفظها في appstate.json لتسريع الدورات التالية
-          fs.writeFileSync(appstatePath, JSON.stringify(parsed, null, 2));
+          // لا نكتب الكوكيز إلى أي ملف؛ ملفات الجلسة تبقى يدوية وثابتة.
           return parsed;
         }
       }
@@ -93,8 +92,6 @@ function startLogin(attempt = 1) {
 }
 
 function startBot(api) {
-  saveAppState(api);
-
   api.setOptions({
     listenEvents: config.listenEvents,
     selfListen:   false,
@@ -105,15 +102,11 @@ function startBot(api) {
   logger.info(`✅ تسجيل الدخول نجح | ID: ${botID}`);
   logger.info(`🤖 ${config.botName} يعمل | البادئة: ${config.prefix}`);
 
-  // حفظ الكوكيز كل 10 دقائق
-  const saveInterval = setInterval(() => saveAppState(api), 10 * 60 * 1000);
-
   // ===== الاستماع =====
   api.listenMqtt((err, event) => {
     if (err) {
       const msg = err.error || err.message || JSON.stringify(err);
       logger.error("خطأ في الاستماع: " + msg);
-      clearInterval(saveInterval);
       logger.info("🔄 انقطع الاتصال — إعادة تسجيل الدخول بعد 5 ثواني...");
       setTimeout(() => startLogin(1), 5000);
       return;
@@ -164,18 +157,6 @@ function startBot(api) {
         }, 1500);
       }
     }
-  }
-}
-
-function saveAppState(api) {
-  try {
-    const s = api.getAppState();
-    if (s && s.length) {
-      fs.writeFileSync(appstatePath, JSON.stringify(s, null, 2));
-      logger.info("💾 تم حفظ الكوكيز تلقائياً");
-    }
-  } catch (e) {
-    logger.error("⚠️ فشل حفظ الكوكيز: " + e.message);
   }
 }
 

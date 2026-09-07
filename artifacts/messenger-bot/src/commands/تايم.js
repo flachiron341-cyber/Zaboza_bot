@@ -4,8 +4,8 @@ module.exports = {
   config: {
     name: "تايم",
     aliases: ["time", "وقت"],
-    description: "يضبط التأخير بين رسائل الاتاك (من 1ث إلى 540ث)",
-    usage: "!تايم [ثواني]",
+    description: "يضبط تأخير الاتاك ثابتاً أو كنطاق عشوائي",
+    usage: "!تايم [ثواني] أو !تايم [من_إلى]",
     cooldown: 3,
     adminOnly: false,
   },
@@ -13,25 +13,47 @@ module.exports = {
   async run({ api, event, args }) {
     const { threadID } = event;
 
-    if (!args[0] || isNaN(args[0])) {
-      const cur = (state.attackDelay.get(threadID) || 5000) / 1000;
+    const value = args[0];
+    if (!value) {
+      const current = state.attackDelay.get(threadID) || { min: 5, max: 5 };
+      const display = current.min === current.max
+        ? `${current.min} ثانية`
+        : `${current.min}_${current.max} ثانية`;
       return api.sendMessage(
-        `⏱ التأخير الحالي للاتاك: ${cur}ث\n\nللتغيير: !تايم [ثواني]\nالنطاق المسموح: 1ث – 540ث (9 دقائق)`,
+        `⏱ التأخير الحالي للاتاك: ${display}\n\n` +
+        `للتغيير الثابت: !تايم 20\n` +
+        `للتغيير العشوائي: !تايم 15_30\n` +
+        `النطاق المسموح: 1 إلى 540 ثانية`,
         threadID
       );
     }
 
-    let seconds = parseFloat(args[0]);
-    if (seconds < 1) seconds = 1;
-    if (seconds > 540) seconds = 540;
+    const parts = value.split("_");
+    if (
+      parts.length > 2 ||
+      parts.some((part) => part === "" || !/^\d+(?:\.\d+)?$/.test(part))
+    ) {
+      return api.sendMessage(
+        "❌ الصيغة غير صحيحة.\nاستخدم: !تايم 20 أو !تايم 15_30",
+        threadID
+      );
+    }
 
-    const ms = Math.round(seconds * 1000);
-    state.attackDelay.set(threadID, ms);
+    let min = Number(parts[0]);
+    let max = Number(parts[1] ?? parts[0]);
 
-    const display = seconds >= 60
-      ? `${Math.floor(seconds / 60)} دقيقة${seconds % 60 ? " و" + (seconds % 60) + " ثانية" : ""}`
-      : `${seconds} ثانية`;
+    if (!Number.isFinite(min) || !Number.isFinite(max)) {
+      return api.sendMessage("❌ اكتب أرقاماً صحيحة للوقت.", threadID);
+    }
 
-    api.sendMessage(`✅ تم ضبط تأخير الاتاك على: ${display}`, threadID);
+    // يسمح بكتابة 30_15 أيضاً ويحوّلها تلقائياً إلى 15_30.
+    if (min > max) [min, max] = [max, min];
+    min = Math.max(1, Math.min(540, min));
+    max = Math.max(1, Math.min(540, max));
+
+    state.attackDelay.set(threadID, { min, max });
+
+    const display = min === max ? `${min} ثانية` : `${min}_${max} ثانية`;
+    await api.sendMessage(`✅ تم ضبط تأخير الاتاك على: ${display}`, threadID);
   },
 };
