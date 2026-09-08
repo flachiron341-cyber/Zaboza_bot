@@ -12,6 +12,8 @@ const appstateSecretName = "FACEBOOK_APPSTATE";
 const appstatePath = path.join(__dirname, "../appstate.json");
 const cookiesTxtPath = path.join(__dirname, "../cookies.txt");
 const groupEventImageDir = path.join(__dirname, "../assets/events");
+const groupEventDedupe = new Map();
+const nameRestoreInFlight = new Set();
 
 // ===== تحميل الكوكيز =====
 function isUsableAppState(data) {
@@ -120,7 +122,40 @@ function sendGroupEventImage(api, threadID, filename) {
   api.sendMessage(
     { attachment: fs.createReadStream(imagePath) },
     threadID
-  ).catch((error) => logger.error(`فشل إرسال صورة حدث القروب: ${error.message}`));
+  ).catch((error) => logger.error(`فشل إرسال صورة حدث القروب: ${formatLoginError(error)}`));
+}
+
+function participantID(value) {
+  return String(
+    typeof value === "object"
+      ? value?.userFbId || value?.userID || value?.id || value?.uid || ""
+      : value || ""
+  );
+}
+
+function shouldHandleGroupEvent(event) {
+  const data = event.logMessageData || {};
+  const added = (data.addedParticipants || []).map(participantID).sort().join(",");
+  const actor = participantID(data.leftParticipantFbId);
+  const key = [
+    String(event.threadID || ""),
+    String(event.logMessageType || ""),
+    added,
+    actor,
+  ].join("|");
+  const now = Date.now();
+  const previous = groupEventDedupe.get(key) || 0;
+  groupEventDedupe.set(key, now);
+
+  for (const [savedKey, timestamp] of groupEventDedupe) {
+    if (now - timestamp > 10000) groupEventDedupe.delete(savedKey);
+  }
+
+  if (now - previous < 3000) {
+    logger.warn(`تم تجاهل حدث قروب مكرر: ${key}`);
+    return false;
+  }
+  return true;
 }
 
 function scheduleLogin(attempt = 1, overrideDelay = null) {
@@ -234,12 +269,27 @@ function startBot(api) {
   function handleGroupEvent(api, event) {
     const threadID       = String(event.threadID || "");
     const logMessageType = event.logMessageType;
+    if (
+      (logMessageType === "log:subscribe" || logMessageType === "log:unsubscribe") &&
+      !shouldHandleGroupEvent(event)
+    ) {
+      return;
+    }
 
     if (logMessageType === "log:unsubscribe") {
-      sendGroupEventImage(api, threadID, "1788550124005.jpg");
+      const leftID = participantID(event.logMessageData?.leftParticipantFbId);
+      // عند خروج البوت نفسه لا يمكن إرسال صورة بعد مغادرته، كما أن ذلك
+      // كان سبب خطأ Messenger 1545012 في السجل.
+      if (leftID !== String(botID)) {
+        sendGroupEventImage(api, threadID, "1788550124005.jpg");
+      }
     }
     if (logMessageType === "log:subscribe") {
-      sendGroupEventImage(api, threadID, "1788550142034.jpg");
+      const addedIDs = (event.logMessageData?.addedParticipants || []).map(participantID);
+      const image = addedIDs.includes(String(botID))
+        ? "bot-joined.jpg"
+        : "1788550142034.jpg";
+      sendGroupEventImage(api, threadID, image);
     }
 
     const nicknameProtection = state.nicknameProtectionState.get(threadID);
@@ -247,11 +297,7 @@ function startBot(api) {
     if (nicknameProtection?.active && logMessageType === "log:subscribe") {
       const added = event.logMessageData?.addedParticipants || [];
       for (const participant of added) {
-        const uid = String(
-          typeof participant === "object"
-            ? participant.userFbId || participant.userID || participant.id || ""
-            : participant
-        );
+        const uid = participantID(participant);
         if (uid) nicknameProtection.nicknames.set(uid, "");
       }
       state.persistNicknameProtection(threadID);
@@ -278,20 +324,39 @@ function startBot(api) {
       }
     }
 
-    const protection     = state.protectionState.get(threadID);
-    if (!protection || !protection.active) return;
+    const protection = state.protectionState.get(threadID);
+    const nameProtection = state.nameProtectionState.get(threadID);
+    const protectedName = nameProtection?.active
+      ? nameProtection.name
+      : protection?.active
+        ? protection.name
+        : "";
 
-    if (logMessageType === "log:thread-name") {
+    if (logMessageType === "log:thread-name" && protectedName) {
       const newName = event.logMessageData && event.logMessageData.name;
-      if (newName !== undefined && newName !== protection.name) {
-        logger.info(`🛡 محاولة تغيير اسم القروب → إعادته: "${protection.name}"`);
+      const senderID = String(event.senderID || event.logMessageData?.senderID || "");
+      if (
+        newName !== undefined &&
+        newName !== protectedName &&
+        senderID !== String(botID) &&
+        !nameRestoreInFlight.has(threadID)
+      ) {
+        nameRestoreInFlight.add(threadID);
+        logger.info(`🛡 محاولة إعادة اسم القروب إلى: "${protectedName}"`);
         setTimeout(() => {
-          api.gcname(protection.name, threadID, (err) => {
-            if (!err) logger.info(`✅ أُعيد اسم القروب: "${protection.name}"`);
+          api.gcname(protectedName, threadID, (err) => {
+            nameRestoreInFlight.delete(threadID);
+            if (err) {
+              logger.error(`فشل إعادة اسم القروب: ${formatLoginError(err)}`);
+            } else {
+              logger.info(`✅ أُعيد اسم القروب: "${protectedName}"`);
+            }
           });
         }, 1500);
       }
     }
+
+    if (!protection || !protection.active) return;
 
     if (logMessageType === "log:user-nickname") {
       const changedUID = event.logMessageData && String(event.logMessageData.participant_id || "");

@@ -3,7 +3,7 @@ const state = require("../state");
 module.exports = {
   config: {
     name: "تايم",
-    aliases: ["time", "وقت"],
+    aliases: ["time"],
     description: "يضبط تأخير الاتاك ثابتاً أو كنطاق عشوائي",
     usage: "!تايم [ثواني] أو !تايم [من_إلى]",
     cooldown: 3,

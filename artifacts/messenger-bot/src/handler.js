@@ -49,6 +49,7 @@ async function handleMessage(api, rawEvent, config, botID) {
   const event = normalizeEvent(rawEvent);
   const { senderID, threadID, body, messageReply } = event;
   const developerID = String(config.adminUIDs?.[0] || "");
+  state.stats.messagesReceived++;
 
   // لا نرسل ردوداً تلقائية أو إجابات ألعاب أو رسائل صلاحية
   // لأي عضو غير مسموح له باستخدام البوت.
@@ -125,10 +126,12 @@ async function handleMessage(api, rawEvent, config, botID) {
   setTimeout(() => cooldowns.delete(cooldownKey), cooldownTime);
 
   // تنفيذ الأمر
+  state.stats.commandsProcessed++;
   try {
     logger.info(`▶ ${senderID} → ${config.prefix}${commandName} ${args.join(" ")}`);
     await command.run({ api, event, args, config, botID, commands, messageReply });
   } catch (err) {
+    state.stats.commandFailures++;
     logger.error(`خطأ في أمر ${commandName}: ${err.message}`);
     // لا نرسل رسالة خطأ للمستخدم تلقائياً
   }

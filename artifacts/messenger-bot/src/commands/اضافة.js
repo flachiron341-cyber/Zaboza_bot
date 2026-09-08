@@ -1,11 +1,3 @@
-const fs = require("fs");
-const path = require("path");
-
-const WELCOME_IMAGE_PATH = path.join(
-  __dirname,
-  "../../assets/events/1788550142034.jpg"
-);
-
 module.exports = {
   config: {
     name: "اضافة",
@@ -77,18 +69,11 @@ module.exports = {
       return api.sendMessage(`❌ فشلت الإضافة: ${errMsg}`, threadID);
     }
 
-    const body = `🎉 مرحباً بـ ${targetID} في القروب! يسعدنا وجودك معنا 🥳`;
-
-    if (fs.existsSync(WELCOME_IMAGE_PATH)) {
-      try {
-        await api.sendMessage(
-          { body, attachment: fs.createReadStream(WELCOME_IMAGE_PATH) },
-          threadID
-        );
-        return;
-      } catch {}
-    }
-
-    await api.sendMessage(body, threadID);
+    // صورة الإضافة تُرسل مرة واحدة فقط من log:subscribe في index.js.
+    // إرسالها هنا أيضاً كان سبب ظهورها مرتين بعد نجاح الإضافة.
+    await api.sendMessage(
+      `✅ تمت إضافة ${targetID}.\n🎉 ستصل صورة الترحيب عند تسجيل حدث دخول العضو.`,
+      threadID
+    );
   },
 };

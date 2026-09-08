@@ -1,5 +1,6 @@
 const fs = require("fs");
-const { searchYoutube, downloadYoutubeAudio } = require("../utils/youtube");
+const logger = require("../utils/logger");
+const { searchSong, downloadSongPreview } = require("../utils/music");
 
 module.exports = {
   config: {
@@ -17,19 +18,27 @@ module.exports = {
     if (!query) return api.sendMessage("❌ اكتب اسم الأغنية.", threadID);
 
     await api.sendMessage(`🎵 جاري البحث عن "${query}"...`, threadID);
-    const result = await searchYoutube(query);
-    if (!result) return api.sendMessage("❌ لم أجد الأغنية المطلوبة.", threadID);
-
-    const audioPath = await downloadYoutubeAudio(result.url);
-    if (!audioPath) return api.sendMessage("❌ تعذر تحميل الأغنية كصوت.", threadID);
+    let audioPath = null;
 
     try {
+      const result = await searchSong(query);
+      if (!result) return api.sendMessage("❌ لم أجد معاينة صوتية لهذه الأغنية.", threadID);
+
+      audioPath = await downloadSongPreview(result.preview);
+      if (!audioPath) return api.sendMessage("❌ تعذر تحميل المعاينة الصوتية.", threadID);
+
       await api.sendMessage(
-        { body: `🎧 ${result.title}`, attachment: fs.createReadStream(audioPath) },
+        {
+          body: `🎧 ${result.title} — ${result.artist}\n(معاينة صوتية متاحة من المصدر)`,
+          attachment: fs.createReadStream(audioPath),
+        },
         threadID
       );
+    } catch (error) {
+      logger.error(`فشل أمر اغنية: ${error?.message || error}`);
+      await api.sendMessage("❌ حدث خطأ أثناء البحث أو تحميل الصوت. حاول باسم آخر لاحقاً.", threadID);
     } finally {
-      fs.unlink(audioPath, () => {});
+      if (audioPath) fs.unlink(audioPath, () => {});
     }
   },
 };

@@ -1,3 +1,6 @@
+const state = require("../state");
+const logger = require("../utils/logger");
+
 module.exports = {
   config: {
     name: "نيم",
@@ -5,7 +8,7 @@ module.exports = {
     description: "يغيّر اسم القروب",
     usage: "!نيم [الاسم الجديد]",
     cooldown: 10,
-    adminOnly: false,
+    adminOnly: true,
   },
 
   async run({ api, event, args }) {
@@ -20,13 +23,22 @@ module.exports = {
 
     const newName = args.join(" ");
 
-    // نغيّر الاسم ثم نؤكد النجاح فقط إذا نجح
     try {
-      await api.gcname(newName, threadID);
-      await api.sendMessage(`✅ تم تغيير اسم القروب إلى:\n"${newName}" 🎉`, threadID);
-    } catch {
-      // إذا فشل، نُرسل رسالة نجاح على كل حال لأن ws3-fca أحياناً يرفض بدون سبب
-      await api.sendMessage(`✅ تم إرسال طلب تغيير الاسم إلى:\n"${newName}" 🎉`, threadID);
+      await new Promise((resolve, reject) => {
+        api.gcname(newName, threadID, (err) => (err ? reject(err) : resolve()));
+      });
+      state.persistNameProtection(threadID, newName);
+      await api.sendMessage(
+        `✅ تم تغيير اسم القروب إلى:\n"${newName}" 🎉\n🛡️ تم حفظه كاسم محمي.`,
+        threadID
+      );
+    } catch (error) {
+      logger.error(`فشل تغيير اسم القروب أو حفظ الحماية: ${error?.message || error}`);
+      await api.sendMessage(
+        `❌ تعذر تغيير اسم القروب. تأكد أن البوت مسؤول وأن Facebook يسمح بالعملية.\n` +
+        `السبب: ${error?.message || "خطأ غير معروف"}`,
+        threadID
+      );
     }
   },
 };

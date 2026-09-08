@@ -31,6 +31,13 @@ for (const [threadID, entry] of Object.entries(savedState.nicknameProtections ||
   nicknameProtectionState.set(String(threadID), { active: true, nicknames });
 }
 
+const nameProtectionState = new Map(
+  Object.entries(savedState.nameProtections || {}).map(([threadID, name]) => [
+    String(threadID),
+    { active: true, name: String(name || "") },
+  ])
+);
+
 module.exports = {
   // جلسات أمر !اسئلة  —  key: messageID, value: { msgID, answer, threadID, timer }
   gameSessions: new Map(),
@@ -49,6 +56,20 @@ module.exports = {
 
   // حماية الكنيات فقط — تحفظ بعد إعادة تشغيل البوت.
   nicknameProtectionState,
+
+  // حماية اسم القروب التي يفعّلها أمر !نيم.
+  nameProtectionState,
+
+  // لعبة التخمين: جلسة مستقلة لكل قروب ومستخدم.
+  guessGames: new Map(),
+
+  // إحصائيات التشغيل الحالية.
+  stats: {
+    startedAt: Date.now(),
+    messagesReceived: 0,
+    commandsProcessed: 0,
+    commandFailures: 0,
+  },
 
   // الرسائل الحديثة اللازمة لاكتشاف الرسائل المحذوفة.
   messageHistory: new Map(),
@@ -76,6 +97,17 @@ module.exports = {
   removeNicknameProtection(threadID) {
     this.nicknameProtectionState.delete(String(threadID));
     persistentState.removeNicknameProtection(String(threadID));
+  },
+
+  persistNameProtection(threadID, name) {
+    const id = String(threadID);
+    this.nameProtectionState.set(id, { active: true, name: String(name || "") });
+    persistentState.saveNameProtection(id, name);
+  },
+
+  removeNameProtection(threadID) {
+    this.nameProtectionState.delete(String(threadID));
+    persistentState.removeNameProtection(String(threadID));
   },
 
   persistAttackDelay(threadID) {

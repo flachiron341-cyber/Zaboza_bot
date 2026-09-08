@@ -82,6 +82,24 @@ function removeGroupProtection(threadID) {
   writeState();
 }
 
+function getNameProtections() {
+  return data.nameProtections && typeof data.nameProtections === "object"
+    ? data.nameProtections
+    : {};
+}
+
+function saveNameProtection(threadID, name) {
+  data.nameProtections = getNameProtections();
+  data.nameProtections[String(threadID)] = String(name || "");
+  writeState();
+}
+
+function removeNameProtection(threadID) {
+  data.nameProtections = getNameProtections();
+  delete data.nameProtections[String(threadID)];
+  writeState();
+}
+
 function getCreatedGroups() {
   return data.createdGroups && typeof data.createdGroups === "object"
     ? data.createdGroups
@@ -107,6 +125,9 @@ module.exports = {
   getGroupProtections,
   saveGroupProtection,
   removeGroupProtection,
+  getNameProtections,
+  saveNameProtection,
+  removeNameProtection,
   getCreatedGroup,
   saveCreatedGroup,
 };

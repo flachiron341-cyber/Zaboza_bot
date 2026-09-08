@@ -1,4 +1,5 @@
 const state = require("../state");
+const logger = require("../utils/logger");
 
 module.exports = {
   config: {
@@ -7,7 +8,7 @@ module.exports = {
     description: "يضع كنية لكل أعضاء القروب | !كين عكس لإزالة الكنيات",
     usage: "!كين [الكنية] | !كين عكس",
     cooldown: 15,
-    adminOnly: false,
+    adminOnly: true,
   },
 
   async run({ api, event, args }) {
@@ -66,16 +67,20 @@ async function applyNickname(api, threadID, nickname) {
         });
       });
       done++;
-    } catch {
+      } catch (error) {
       failed++;
+        logger.error(`فشل تغيير كنية العضو ${uid}: ${error?.message || error}`);
     }
-    await new Promise((r) => setTimeout(r, 250));
+      if (uid !== participants[participants.length - 1]) {
+        const delay = 2000 + Math.floor(Math.random() * 3001);
+        await new Promise((r) => setTimeout(r, delay));
+      }
   }
 
   const icon = nickname ? "✅" : "🔄";
   const resultText = nickname
-    ? `تم تغيير كنيات كل الاعضاء إلى "${nickname}"`
-    : "تم حذف كنيات كل الاعضاء";
+    ? `تمت محاولة تغيير كنيات الأعضاء إلى "${nickname}"`
+    : "تمت محاولة حذف كنيات الأعضاء";
   await api.sendMessage(
     `${icon} ${resultText}\n✔ نجح: ${done} | ✖ فشل: ${failed}`,
     threadID
