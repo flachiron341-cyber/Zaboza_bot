@@ -3,6 +3,7 @@ const path = require("path");
 const logger = require("./utils/logger");
 const state  = require("./state");
 const usageAccess = require("./utils/usageAccess");
+const { handleNextMessage } = require("./utils/gameRouter");
 
 // ===== تحميل الأوامر =====
 const commands = new Map();
@@ -69,7 +70,7 @@ async function handleMessage(api, rawEvent, config, botID) {
     );
   }
 
-  // ── إجابات الألعاب (يجب أن يكون رداً على رسالة البوت) ──
+  // ── إجابات الألعاب القديمة (بالرد على رسالة البوت) ──
   if (messageReply && body) {
     const refID = String(messageReply.messageID);
 
@@ -86,6 +87,9 @@ async function handleMessage(api, rawEvent, config, botID) {
       return;
     }
   }
+
+  // الألعاب الجديدة تستقبل الرسالة التالية للمستخدم حتى بدون رد مباشر.
+  if (body && await handleNextMessage(api, event, config.prefix)) return;
 
   if (!body || !body.startsWith(config.prefix)) return;
 
@@ -106,13 +110,17 @@ async function handleMessage(api, rawEvent, config, botID) {
   }
 
   // صلاحيات الأدمن
-  if (command.config.adminOnly && !config.adminUIDs.includes(senderID)) {
+  if (
+    command.config.adminOnly &&
+    !(config.adminUIDs || []).some((id) => String(id) === String(senderID))
+  ) {
     return api.sendMessage("🚫 هذا الأمر للمشرفين فقط.", threadID);
   }
 
   // نظام التهدئة
   const cooldownKey  = `${senderID}-${command.config.name}`;
-  const cooldownTime = (command.config.cooldown || config.cooldown) * 1000;
+  const cooldownTime =
+    (command.config.cooldown ?? config.cooldown ?? 0) * 1000;
   const now          = Date.now();
 
   if (cooldowns.has(cooldownKey)) {

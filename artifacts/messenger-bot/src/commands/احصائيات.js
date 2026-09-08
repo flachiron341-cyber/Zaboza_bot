@@ -1,4 +1,5 @@
 const state = require("../state");
+const { info } = require("../utils/brand");
 
 function formatUptime(seconds) {
   const total = Math.max(0, Math.floor(seconds));
@@ -23,13 +24,12 @@ module.exports = {
     const stats = state.stats;
     const uptime = (Date.now() - stats.startedAt) / 1000;
     return api.sendMessage(
-      [
-        "📊 إحصائيات zaboza bot",
+      info("إحصائيات ZABOZA", [
         `⏱ وقت التشغيل: ${formatUptime(uptime)}`,
         `💬 الرسائل المستلمة: ${stats.messagesReceived}`,
         `⚙️ الأوامر المعالجة: ${stats.commandsProcessed}`,
         `❌ أخطاء الأوامر: ${stats.commandFailures}`,
-      ].join("\n"),
+      ]),
       String(event.threadID)
     );
   },

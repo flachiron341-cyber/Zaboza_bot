@@ -5,6 +5,7 @@ const quotes = [
   "كل بداية صعبة، لكن الاستمرار يصنع النتيجة.",
   "ثق بنفسك وابدأ بما تملك.",
 ];
+const { info } = require("../utils/brand");
 
 module.exports = {
   config: {
@@ -17,6 +18,6 @@ module.exports = {
   },
   async run({ api, event }) {
     const quote = quotes[Math.floor(Math.random() * quotes.length)];
-    return api.sendMessage(`💬 ${quote}`, String(event.threadID));
+    return api.sendMessage(info("اقتباس اليوم", [quote]), String(event.threadID));
   },
 };

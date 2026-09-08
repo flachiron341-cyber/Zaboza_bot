@@ -1,10 +1,13 @@
 const state = require("../state");
+const { userKey, clearSession } = require("../utils/gameRouter");
+const { success, error, info } = require("../utils/brand");
 
 function toNumber(value) {
   return Number(
     String(value || "")
       .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
       .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)))
+      .trim()
   );
 }
 
@@ -21,44 +24,53 @@ module.exports = {
   async run({ api, event, args }) {
     const threadID = String(event.threadID);
     const senderID = String(event.senderID);
-    const key = `${threadID}:${senderID}`;
-    const active = state.guessGames.get(key);
+    const key = userKey(threadID, senderID);
+    let active = state.guessGames.get(key);
 
     if (!args.length) {
       if (active) {
-        return api.sendMessage(`🎯 لديك لعبة جارية. أرسل تخميناً بين 1 و100.\nالمحاولات المتبقية: ${active.attempts}`, threadID);
+        return api.sendMessage(
+          info("لعبة تخمين جارية", [`المحاولات المتبقية: ${active.attempts}`, "أرسل رقماً بين 1 و100 أو اكتب !الغاء."]),
+          threadID
+        );
       }
-      state.guessGames.set(key, {
+
+      active = {
         answer: Math.floor(Math.random() * 100) + 1,
         attempts: 7,
-      });
+        startedAt: Date.now(),
+      };
+      active.timer = setTimeout(() => {
+        if (state.guessGames.get(key) !== active) return;
+        clearSession(state.guessGames, key, active);
+        api.sendMessage(error("انتهى وقت التخمين", ["انتهت الجلسة تلقائياً بعد فترة من عدم النشاط."]), threadID);
+      }, 15 * 60 * 1000);
+      state.guessGames.set(key, active);
       return api.sendMessage(
-        "🎯 بدأت لعبة التخمين!\nاخترت رقماً بين 1 و100.\nأرسل: !تخمين الرقم\nلديك 7 محاولات.",
+        info("بدأت لعبة التخمين", ["اخترت رقماً سرياً من 1 إلى 100.", "أرسل تخمينك في الرسالة التالية.", "لديك 7 محاولات."]),
         threadID
       );
     }
 
     if (!active) {
-      return api.sendMessage("❌ ابدأ اللعبة أولاً بكتابة !تخمين.", threadID);
+      return api.sendMessage(error("لا توجد لعبة", ["ابدأ أولاً بكتابة !تخمين."]), threadID);
     }
 
     const guess = toNumber(args[0]);
     if (!Number.isInteger(guess) || guess < 1 || guess > 100) {
-      return api.sendMessage("❌ اكتب رقماً صحيحاً بين 1 و100.", threadID);
+      return api.sendMessage(error("تخمين غير صالح", ["اكتب رقماً صحيحاً من 1 إلى 100."]), threadID);
     }
 
     active.attempts -= 1;
     if (guess === active.answer) {
-      state.guessGames.delete(key);
-      return api.sendMessage(`🎉 صحيح! الرقم هو ${active.answer}. ربحت اللعبة!`, threadID);
+      clearSession(state.guessGames, key, active);
+      return api.sendMessage(success("فوز في لعبة التخمين", [`الرقم السري: ${active.answer}`, "أحسنت، لقد ربحت."]), threadID);
     }
-
     if (active.attempts <= 0) {
-      state.guessGames.delete(key);
-      return api.sendMessage(`انتهت المحاولات 😔 الرقم الصحيح كان ${active.answer}.`, threadID);
+      clearSession(state.guessGames, key, active);
+      return api.sendMessage(error("انتهت المحاولات", [`الرقم السري كان: ${active.answer}`]), threadID);
     }
-
-    const hint = guess < active.answer ? "الرقم أكبر من تخمينك." : "الرقم أصغر من تخمينك.";
-    return api.sendMessage(`❌ ليس صحيحاً. ${hint}\nالمحاولات المتبقية: ${active.attempts}`, threadID);
+    const hint = guess < active.answer ? "الرقم السري أكبر." : "الرقم السري أصغر.";
+    return api.sendMessage(info("تلميح التخمين", [hint, `المحاولات المتبقية: ${active.attempts}`]), threadID);
   },
 };

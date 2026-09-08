@@ -1,3 +1,5 @@
+const { info } = require("../utils/brand");
+
 module.exports = {
   config: {
     name: "uid",
@@ -11,8 +13,8 @@ module.exports = {
   async run({ api, event, messageReply }) {
     const { threadID, senderID } = event;
     if (messageReply) {
-      return api.sendMessage(`🆔 ID المُشار إليه: ${messageReply.senderID}`, threadID);
+      return api.sendMessage(info("معرّف الحساب", [`المشار إليه: ${messageReply.senderID}`]), threadID);
     }
-    api.sendMessage(`🆔 ID الخاص بك: ${senderID}`, threadID);
+    api.sendMessage(info("معرّف الحساب", [`معرّفك: ${senderID}`]), threadID);
   },
 };

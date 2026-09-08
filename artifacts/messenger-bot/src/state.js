@@ -63,6 +63,14 @@ module.exports = {
   // لعبة التخمين: جلسة مستقلة لكل قروب ومستخدم.
   guessGames: new Map(),
 
+  // ألعاب الرسائل التالية: key = threadID:senderID.
+  trueFalseGames: new Map(),
+  lettersGames: new Map(),
+  reverseGames: new Map(),
+
+  // XO: مباراة واحدة مستقلة لكل قروب.
+  xoGames: new Map(),
+
   // إحصائيات التشغيل الحالية.
   stats: {
     startedAt: Date.now(),

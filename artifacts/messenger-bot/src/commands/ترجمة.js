@@ -1,5 +1,6 @@
 const { translateText } = require("../utils/publicApis");
 const logger = require("../utils/logger");
+const { info, error } = require("../utils/brand");
 
 module.exports = {
   config: {
@@ -14,17 +15,17 @@ module.exports = {
   async run({ api, event, args }) {
     const threadID = String(event.threadID);
     if (args.length < 2) {
-      return api.sendMessage("❌ الصيغة: !ترجمة النص اللغة\nمثال: !ترجمة صباح الخير en", threadID);
+      return api.sendMessage(error("صيغة الترجمة", ["!ترجمة النص اللغة", "مثال: !ترجمة صباح الخير en"]), threadID);
     }
 
     const targetLanguage = args.pop();
     const text = args.join(" ").trim();
     try {
       const result = await translateText(text, targetLanguage);
-      return api.sendMessage(`🌐 الترجمة (${result.target}):\n${result.text}`, threadID);
-    } catch (error) {
-      logger.error(`فشل أمر ترجمة: ${error?.message || error}`);
-      return api.sendMessage(`❌ تعذرت الترجمة: ${error?.message || "حاول لاحقاً."}`, threadID);
+      return api.sendMessage(info("الترجمة", [`اللغة: ${result.target}`, result.text]), threadID);
+    } catch (err) {
+      logger.error(`فشل أمر ترجمة: ${err?.message || err}`);
+      return api.sendMessage(error("تعذرت الترجمة", [err?.message || "حاول لاحقاً."]), threadID);
     }
   },
 };

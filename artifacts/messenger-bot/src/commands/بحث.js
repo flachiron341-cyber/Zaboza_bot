@@ -1,5 +1,6 @@
 const { searchWeb } = require("../utils/publicApis");
 const logger = require("../utils/logger");
+const { info, error } = require("../utils/brand");
 
 module.exports = {
   config: {
@@ -14,23 +15,23 @@ module.exports = {
   async run({ api, event, args }) {
     const threadID = String(event.threadID);
     const query = args.join(" ").trim();
-    if (!query) return api.sendMessage("❌ اكتب الكلمة التي تريد البحث عنها.", threadID);
+    if (!query) return api.sendMessage(error("صيغة البحث", ["اكتب الكلمة التي تريد البحث عنها."]), threadID);
 
     try {
       const results = await searchWeb(query);
-      if (!results.length) return api.sendMessage(`❌ لم أجد نتائج عن "${query}".`, threadID);
-      const text = [
-        `🔎 نتائج البحث عن: ${query}`,
+      if (!results.length) return api.sendMessage(error("لا توجد نتائج", [`لم أجد نتائج عن: ${query}`]), threadID);
+      const text = info("نتائج البحث", [
+        `الكلمة: ${query}`,
         "",
         ...results.map(
           (item, index) =>
             `${index + 1}. ${item.title}\n${item.snippet || "لا يوجد ملخص"}\n${item.url}`
         ),
-      ].join("\n\n");
+      ]);
       return api.sendMessage(text.slice(0, 6000), threadID);
-    } catch (error) {
-      logger.error(`فشل أمر بحث: ${error?.message || error}`);
-      return api.sendMessage("❌ تعذر تنفيذ البحث حالياً.", threadID);
+    } catch (err) {
+      logger.error(`فشل أمر بحث: ${err?.message || err}`);
+      return api.sendMessage(error("تعذر البحث", ["حاول لاحقاً."]), threadID);
     }
   },
 };

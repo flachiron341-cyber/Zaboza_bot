@@ -5,6 +5,7 @@ const messages = [
   "خبر جيد في الطريق، بإذن الله.",
   "استمر، فنتيجتك أفضل مما تتوقع.",
 ];
+const { info } = require("../utils/brand");
 
 module.exports = {
   config: {
@@ -18,6 +19,6 @@ module.exports = {
   async run({ api, event }) {
     const percent = Math.floor(Math.random() * 101);
     const message = messages[Math.floor(Math.random() * messages.length)];
-    return api.sendMessage(`🍀 نسبة حظك اليوم: ${percent}%\n${message}`, String(event.threadID));
+    return api.sendMessage(info("قراءة الحظ", [`النسبة: ${percent}%`, message]), String(event.threadID));
   },
 };

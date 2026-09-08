@@ -1,3 +1,5 @@
+const { info } = require("../utils/brand");
+
 module.exports = {
   config: {
     name: "معلومات",
@@ -19,18 +21,13 @@ module.exports = {
     const m = Math.floor((up % 3600) / 60);
     const s = Math.floor(up % 60);
 
-    const msg = [
-      `╔══════════════════════╗`,
-      `║   🤖  zaboza bot      ║`,
-      `╚══════════════════════╝`,
-      ``,
+    const msg = info("معلومات البوت", [
       `🆔 ID: ${botID}`,
       `📦 الأوامر: ${seen.size}`,
       `🔑 البادئة: ${config.prefix}`,
       `⏱ وقت التشغيل: ${h}س ${m}د ${s}ث`,
-      ``,
       `💬 ${config.prefix}مساعدة — لعرض الأوامر`,
-    ].join("\n");
+    ]);
 
     api.sendMessage(msg, threadID);
   },

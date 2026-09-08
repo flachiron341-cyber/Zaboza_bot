@@ -1,5 +1,6 @@
 const { getWeather } = require("../utils/publicApis");
 const logger = require("../utils/logger");
+const { info, error } = require("../utils/brand");
 
 module.exports = {
   config: {
@@ -14,22 +15,19 @@ module.exports = {
   async run({ api, event, args }) {
     const threadID = String(event.threadID);
     const city = args.join(" ").trim();
-    if (!city) return api.sendMessage("❌ اكتب اسم المدينة.", threadID);
+    if (!city) return api.sendMessage(error("المدينة غير موجودة", ["اكتب اسم المدينة."]), threadID);
 
     try {
       const weather = await getWeather(city);
-      return api.sendMessage(
-        [
-          `🌤️ الطقس في ${weather.city}${weather.country ? `، ${weather.country}` : ""}`,
+      return api.sendMessage(info("حالة الطقس", [
+          `المكان: ${weather.city}${weather.country ? `، ${weather.country}` : ""}`,
           `الحالة: ${weather.description}`,
           `🌡️ الحرارة: ${weather.temp}°C | المحسوسة: ${weather.feelsLike}°C`,
           `💧 الرطوبة: ${weather.humidity}% | 💨 الرياح: ${weather.wind} كم/س`,
-        ].join("\n"),
-        threadID
-      );
-    } catch (error) {
-      logger.error(`فشل أمر طقس: ${error?.message || error}`);
-      return api.sendMessage("❌ تعذر جلب الطقس لهذه المدينة حالياً.", threadID);
+        ]), threadID);
+    } catch (err) {
+      logger.error(`فشل أمر طقس: ${err?.message || err}`);
+      return api.sendMessage(error("تعذر جلب الطقس", ["تحقق من اسم المدينة وحاول لاحقاً."]), threadID);
     }
   },
 };
