@@ -1,29 +1,29 @@
+const fs = require("fs");
+const path = require("path");
+
+const menuImagePath = path.join(__dirname, "../../assets/menu.jpg");
+
 module.exports = {
   config: {
     name: "حذف",
-    aliases: ["delete", "unsend"],
-    description: "يحذف رسالة البوت التي رددت عليها",
-    usage: "!حذف (بالرد على رسالة البوت)",
+    aliases: ["deletemenu", "delete_menu"],
+    description: "يحذف صورة قائمة الأوامر المحفوظة",
+    usage: "!حذف",
     cooldown: 3,
-    adminOnly: false,
+    adminOnly: true,
   },
 
-  async run({ api, event, messageReply, botID }) {
+  async run({ api, event }) {
     const threadID = String(event.threadID);
-    if (!messageReply?.messageID) {
-      return api.sendMessage("❌ يجب الرد على رسالة البوت التي تريد حذفها.", threadID);
-    }
-    if (String(messageReply.senderID) !== String(botID)) {
-      return api.sendMessage("❌ يمكن حذف رسائل البوت فقط.", threadID);
+    if (!fs.existsSync(menuImagePath)) {
+      return api.sendMessage("ℹ️ لا توجد صورة محفوظة لقائمة الأوامر.", threadID);
     }
 
     try {
-      const unsend = api.unsent || api.unsend;
-      if (typeof unsend !== "function") throw new Error("دالة حذف الرسائل غير متاحة.");
-      await unsend.call(api, String(messageReply.messageID), threadID);
-      return api.sendMessage("✅ تم حذف الرسالة.", threadID);
+      fs.unlinkSync(menuImagePath);
+      return api.sendMessage("✅ تم حذف صورة قائمة الأوامر المحفوظة.", threadID);
     } catch (error) {
-      return api.sendMessage(`❌ تعذر حذف الرسالة: ${error.message}`, threadID);
+      return api.sendMessage(`❌ تعذر حذف صورة قائمة الأوامر: ${error.message}`, threadID);
     }
   },
 };

@@ -50,6 +50,10 @@ async function handleMessage(api, rawEvent, config, botID) {
   const { senderID, threadID, body, messageReply } = event;
   const developerID = String(config.adminUIDs?.[0] || "");
 
+  // لا نرسل ردوداً تلقائية أو إجابات ألعاب أو رسائل صلاحية
+  // لأي عضو غير مسموح له باستخدام البوت.
+  if (!usageAccess.isAllowed(threadID, senderID, developerID)) return;
+
   state.rememberMessage(event);
 
   const autoReplyWords = ["انس", "انسة", "زينون", "زينونة"];
@@ -62,16 +66,6 @@ async function handleMessage(api, rawEvent, config, botID) {
       "ماذا تريد امك من نياک امها يا ولد لقحـبة🤮🖕🏿🍆هل تريد ان تمصه له يا قرد🤓🫦⛩️",
       threadID
     );
-  }
-
-  // تمنع الصلاحيات غير المسموحة من استخدام الردود التفاعلية أيضاً
-  // مثل إجابات !اسئلة و!رياضيات واختيارات !فيديو.
-  if (
-    messageReply &&
-    body &&
-    !usageAccess.isAllowed(threadID, senderID, developerID)
-  ) {
-    return;
   }
 
   // ── إجابات الألعاب (يجب أن يكون رداً على رسالة البوت) ──
@@ -140,8 +134,11 @@ async function handleMessage(api, rawEvent, config, botID) {
   }
 }
 
-async function handleUnsend(api, rawEvent) {
+async function handleUnsend(api, rawEvent, config) {
   const event = normalizeEvent(rawEvent);
+  const developerID = String(config?.adminUIDs?.[0] || "");
+  if (!usageAccess.isAllowed(event.threadID, event.senderID, developerID)) return;
+
   const deleted = state.messageHistory.get(String(event.messageID || ""));
   const body = deleted?.body || "تعذر حفظ نص الرسالة قبل حذفها.";
   const senderID = String(event.senderID || deleted?.senderID || "");

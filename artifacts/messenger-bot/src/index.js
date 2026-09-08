@@ -93,10 +93,23 @@ function loadAppState() {
 
 // ===== تسجيل الدخول مع إعادة المحاولة =====
 const RETRY_BASE_MS = 30000;
-const MAX_RETRY_DELAY_MS = 5 * 60 * 1000;
+const MAX_RETRY_DELAY_MS = 30000;
 let retryTimer = null;
 let loginInProgress = false;
 let activeAPI = null;
+
+function formatLoginError(err) {
+  if (!err) return "سبب غير معروف";
+  const details = [
+    err.error,
+    err.message,
+    err.code,
+    typeof err.stack === "string" ? err.stack.split("\n")[0] : "",
+  ]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+  return details[0] || "تعذر تحديد سبب الخطأ";
+}
 
 function sendGroupEventImage(api, threadID, filename) {
   const imagePath = path.join(groupEventImageDir, filename);
@@ -139,25 +152,36 @@ function startLogin(attempt = 1) {
 
   logger.info(`⏳ جاري تسجيل الدخول... (محاولة ${attempt})`);
 
-  login(
-    { appState: appstate },
-    {
-      autoReconnect: false,
-      listenEvents: config.listenEvents,
-      selfListen: false,
-      logLevel: "silent",
-    },
-    (err, api) => {
+  try {
+    login(
+      { appState: appstate },
+      {
+        autoReconnect: false,
+        listenEvents: config.listenEvents,
+        selfListen: false,
+        logLevel: "silent",
+      },
+      (err, api) => {
+        loginInProgress = false;
+        if (err) {
+          logger.error(`❌ فشل تسجيل الدخول: ${formatLoginError(err)}`);
+          scheduleLogin(attempt + 1);
+          return;
+        }
+        try {
+          startBot(api);
+        } catch (startError) {
+          activeAPI = null;
+          logger.error(`❌ تعذر تشغيل البوت بعد تسجيل الدخول: ${formatLoginError(startError)}`);
+          scheduleLogin(attempt + 1);
+        }
+      }
+    );
+  } catch (loginError) {
     loginInProgress = false;
-    if (err) {
-      const msg = err.error || JSON.stringify(err);
-      logger.error(`❌ فشل تسجيل الدخول: ${msg}`);
-      scheduleLogin(attempt + 1);
-      return;
-    }
-    startBot(api);
-    }
-  );
+    logger.error(`❌ تعذر بدء تسجيل الدخول: ${formatLoginError(loginError)}`);
+    scheduleLogin(attempt + 1);
+  }
 }
 
 function startBot(api) {
@@ -197,7 +221,7 @@ function startBot(api) {
     }
 
     if (event.type === "message_unsend") {
-      handler.handleUnsend(api, event).catch((e) => {
+      handler.handleUnsend(api, event, config).catch((e) => {
         logger.error("خطأ في كشف الرسالة المحذوفة: " + e.message);
       });
     }
@@ -283,6 +307,25 @@ function startBot(api) {
     }
   }
 }
+
+// إذا استبدل المستخدم appstate.json أثناء انتظار إعادة الاتصال،
+// ألغِ الانتظار الحالي وجرّب الكوكيز الجديدة مباشرة.
+fs.watchFile(appstatePath, { interval: 2000 }, (current, previous) => {
+  if (
+    current.mtimeMs === previous.mtimeMs &&
+    current.size === previous.size &&
+    current.ino === previous.ino
+  ) {
+    return;
+  }
+  if (activeAPI || loginInProgress) return;
+  if (retryTimer) {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  }
+  logger.info("📄 تم تغيير appstate.json — تجربة الكوكيز الجديدة بعد ثانية...");
+  scheduleLogin(1, 1000);
+});
 
 // ===== بدء التشغيل =====
 startLogin();

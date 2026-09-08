@@ -1,2 +1,2 @@
 - [ws3-fca API quirks](ws3-fca-api.md) — sendMessage لا يقبل callback؛ gcname/setNickname/gcmember هي الأسماء الصحيحة
-- [zaboza bot structure](zaboza-bot.md) — بوت مسنجر عربي، 22 أمر، handler.js يُطبّع كل IDs
+- [zaboza bot structure](zaboza-bot.md) — بوت مسنجر عربي، handler.js يُطبّع كل IDs
