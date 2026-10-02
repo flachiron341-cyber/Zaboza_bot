@@ -4,10 +4,10 @@ module.exports = {
   config: {
     name: "اتاك",
     aliases: ["attack", "سبام"],
-    description: "يرسل رسالة بشكل متكرر حتى كتابة !اتاك ايقاف",
+    description: "يرسل خمس رسائل كحد أقصى بالتوقيت المضبوط (للمطورين فقط)",
     usage: "!اتاك [الرسالة] | !اتاك ايقاف",
     cooldown: 5,
-    adminOnly: false,
+    adminOnly: true,
   },
 
   async run({ api, event, args }) {
@@ -45,7 +45,7 @@ module.exports = {
     const max = Number(configured.max);
 
     await api.sendMessage(
-      `✅ بدأ الاتاك!\n📨 الرسالة: "${message}"\n` +
+        `✅ بدأ إرسال خمس رسائل كحد أقصى.\n📨 الرسالة: "${message}"\n` +
       `⏱ كل ${min === max ? `${min} ثانية` : `مدة عشوائية بين ${min} و${max} ثانية`}\n\n` +
       `🛑 لإيقافه: !اتاك ايقاف`,
       threadID
@@ -70,9 +70,17 @@ module.exports = {
 
         try {
           await api.sendMessage(message, threadID);
-        } catch {}
+        } catch {
+          state.attackState.delete(threadID);
+          return;
+        }
 
-        // يتم اختيار مدة جديدة بعد كل رسالة.
+        current.sent += 1;
+        if (current.sent >= 5) {
+          state.attackState.delete(threadID);
+          await api.sendMessage("✅ انتهى الإرسال المحدود.", threadID);
+          return;
+        }
         scheduleNext();
       }, randomDelay());
     };
@@ -83,6 +91,7 @@ module.exports = {
       message,
       min,
       max,
+      sent: 0,
     });
     scheduleNext();
   },

@@ -2,6 +2,8 @@
  * قاموس عربي→إنجليزي لكلمات البحث الشائعة في الصور
  * يُستخدم في أمر !صورة لتحسين نتائج البحث
  */
+const axios = require("axios");
+
 const DICT = {
   // رياضة
   "ميسي": "messi soccer football",
@@ -109,4 +111,22 @@ function toEnglishQuery(query) {
   return trimmed;
 }
 
-module.exports = { toEnglishQuery };
+async function toEnglishSearchQuery(query) {
+  const translated = toEnglishQuery(query);
+  if (!/[\u0600-\u06FF]/u.test(translated)) return translated;
+  try {
+    const response = await axios.get("https://translate.googleapis.com/translate_a/single", {
+      params: { client: "gtx", sl: "auto", tl: "en", dt: "t", q: String(query || "").trim() },
+      timeout: 10000,
+    });
+    const parts = response.data?.[0];
+    const result = Array.isArray(parts)
+      ? parts.map((part) => String(part?.[0] || "")).join(" ").trim()
+      : "";
+    return result || translated;
+  } catch {
+    return translated;
+  }
+}
+
+module.exports = { toEnglishQuery, toEnglishSearchQuery };

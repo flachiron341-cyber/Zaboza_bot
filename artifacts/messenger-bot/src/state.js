@@ -3,6 +3,7 @@
  */
 const persistentState = require("./utils/persistentState");
 const savedState = persistentState.readState();
+const autoReplySettings = persistentState.getAutoReply();
 
 const attackDelay = new Map(
   Object.entries(savedState.attackDelays || {}).map(([threadID, delay]) => [
@@ -13,22 +14,10 @@ const attackDelay = new Map(
 
 const protectionState = new Map();
 for (const [threadID, entry] of Object.entries(savedState.groupProtections || {})) {
-  const nicknames = new Map(
-    Object.entries(entry?.nicknames || {}).map(([uid, nickname]) => [String(uid), nickname ?? ""])
-  );
   protectionState.set(String(threadID), {
     active: true,
     name: String(entry?.name || ""),
-    nicknames,
   });
-}
-
-const nicknameProtectionState = new Map();
-for (const [threadID, entry] of Object.entries(savedState.nicknameProtections || {})) {
-  const nicknames = new Map(
-    Object.entries(entry?.nicknames || {}).map(([uid, nickname]) => [String(uid), nickname ?? ""])
-  );
-  nicknameProtectionState.set(String(threadID), { active: true, nicknames });
 }
 
 const nameProtectionState = new Map(
@@ -54,11 +43,9 @@ module.exports = {
   // حماية اسم القروب والكنيات — key: threadID, value: { active, name, nicknames: Map }
   protectionState,
 
-  // حماية الكنيات فقط — تحفظ بعد إعادة تشغيل البوت.
-  nicknameProtectionState,
-
   // حماية اسم القروب التي يفعّلها أمر !نيم.
   nameProtectionState,
+  autoReplySettings,
 
   // لعبة التخمين: جلسة مستقلة لكل قروب ومستخدم.
   guessGames: new Map(),
@@ -96,17 +83,6 @@ module.exports = {
     }
   },
 
-  persistNicknameProtection(threadID) {
-    const entry = this.nicknameProtectionState.get(String(threadID));
-    if (!entry) return;
-    persistentState.saveNicknameProtection(String(threadID), entry.nicknames);
-  },
-
-  removeNicknameProtection(threadID) {
-    this.nicknameProtectionState.delete(String(threadID));
-    persistentState.removeNicknameProtection(String(threadID));
-  },
-
   persistNameProtection(threadID, name) {
     const id = String(threadID);
     this.nameProtectionState.set(id, { active: true, name: String(name || "") });
@@ -116,6 +92,12 @@ module.exports = {
   removeNameProtection(threadID) {
     this.nameProtectionState.delete(String(threadID));
     persistentState.removeNameProtection(String(threadID));
+  },
+
+  saveAutoReply(settings) {
+    this.autoReplySettings.enabled = Boolean(settings.enabled);
+    this.autoReplySettings.response = String(settings.response || "");
+    persistentState.saveAutoReply(this.autoReplySettings);
   },
 
   persistAttackDelay(threadID) {

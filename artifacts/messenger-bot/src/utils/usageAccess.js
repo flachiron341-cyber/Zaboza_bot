@@ -7,9 +7,9 @@ const filePath = path.join(__dirname, "../data/usage.json");
 const usageState = new Map();
 
 function normalizeRecord(record) {
-  const mode = ["all", "developer", "users"].includes(record?.mode)
+  const mode = ["developer", "users"].includes(record?.mode)
     ? record.mode
-    : "all";
+    : "developer";
 
   return {
     mode,
@@ -25,7 +25,7 @@ function load() {
       usageState.set(String(threadID), normalizeRecord(record));
     }
   } catch {
-    // يبدأ الوضع الافتراضي "الجميع" إذا كان ملف الإعدادات غير موجود أو تالفاً.
+    // الوصول الافتراضي مقفل للمطورين فقط.
   }
 }
 
@@ -48,12 +48,15 @@ function save() {
 function get(threadID) {
   const id = String(threadID);
   if (!usageState.has(id)) {
-    usageState.set(id, { mode: "all", users: new Set() });
+    usageState.set(id, { mode: "developer", users: new Set() });
   }
   return usageState.get(id);
 }
 
 function setMode(threadID, mode) {
+  if (!["developer", "users"].includes(mode)) {
+    throw new Error("وضع الوصول يجب أن يكون developer أو users.");
+  }
   const id = String(threadID);
   const record = get(id);
   record.mode = mode;
@@ -73,13 +76,21 @@ function grantUser(threadID, userID) {
   return record;
 }
 
-function isAllowed(threadID, senderID, developerID) {
+function revokeUser(threadID, userID) {
+  const record = get(threadID);
+  const removed = record.users.delete(String(userID));
+  if (record.mode === "users" && record.users.size === 0) record.mode = "developer";
+  save();
+  return removed;
+}
+
+function isAllowed(threadID, senderID, developerIDs = []) {
   const record = get(threadID);
   const sender = String(senderID);
+  const developers = Array.isArray(developerIDs) ? developerIDs.map(String) : [String(developerIDs)];
 
-  // المطور يحتفظ دائماً بصلاحية التحكم والاستخدام.
-  if (sender === String(developerID)) return true;
-  if (record.mode === "all") return true;
+  // المطورون يحتفظون دائماً بصلاحية التحكم والاستخدام.
+  if (developers.includes(sender)) return true;
   if (record.mode === "developer") return false;
   return record.users.has(sender);
 }
@@ -88,7 +99,7 @@ function describe(threadID) {
   const record = get(threadID);
   if (record.mode === "developer") return "المطور فقط";
   if (record.mode === "users") return `المطور والأعضاء المسموح لهم (${record.users.size})`;
-  return "جميع أعضاء القروب";
+  return "المطورون فقط";
 }
 
 load();
@@ -97,6 +108,7 @@ module.exports = {
   get,
   setMode,
   grantUser,
+  revokeUser,
   isAllowed,
   describe,
 };

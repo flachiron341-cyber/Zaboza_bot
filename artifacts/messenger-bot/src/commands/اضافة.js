@@ -1,3 +1,5 @@
+const { parseFacebookUserID } = require("../utils/facebookUserId");
+
 module.exports = {
   config: {
     name: "اضافة",
@@ -5,28 +7,20 @@ module.exports = {
     description: "يضيف شخصاً للقروب — رُدّ على رسالته أو اكتب رابط حسابه",
     usage: "!اضافة (رُدّ على رسالة) | !اضافة https://www.facebook.com/...",
     cooldown: 10,
-    adminOnly: false,
+    adminOnly: true,
   },
 
-  async run({ api, event, args, messageReply, config }) {
+  async run({ api, event, args, messageReply }) {
     const threadID = String(event.threadID);
-    const senderID = String(event.senderID);
-
-    if (!config.adminUIDs || !config.adminUIDs.includes(senderID)) {
-      return api.sendMessage("🚫 هذا الأمر للمطور فقط.", threadID);
-    }
 
     let targetID = null;
 
-    // حالة 1: رابط فيسبوك
+    // معرّف أو رابط Facebook يحتوي على معرّف رقمي.
     if (args.length > 0) {
-      const url = args[0];
-      const m = url.match(/(?:profile\.php\?id=|facebook\.com\/(?:people\/[^/]+\/)?)(\d{10,})/);
-      if (m) {
-        targetID = m[1];
-      } else {
+      targetID = parseFacebookUserID(args.join(" "));
+      if (!targetID) {
         return api.sendMessage(
-          "❌ رابط غير صحيح!\nمثال: !اضافة https://www.facebook.com/profile.php?id=61591676525701",
+          "❌ اكتب ID أو رابط Facebook يحتوي على ID رقمي.",
           threadID
         );
       }

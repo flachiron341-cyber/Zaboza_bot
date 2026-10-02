@@ -1,5 +1,5 @@
 const { searchImages, downloadImage } = require("../utils/images");
-const { toEnglishQuery }              = require("../utils/translate");
+const { toEnglishSearchQuery }        = require("../utils/translate");
 const fs = require("fs");
 
 module.exports = {
@@ -22,17 +22,21 @@ module.exports = {
       );
 
     const arabicQuery = args.join(" ");
-    const engQuery    = toEnglishQuery(arabicQuery);
+    const engQuery    = await toEnglishSearchQuery(arabicQuery);
 
     await api.sendMessage(`🔍 جاري البحث عن صور "${arabicQuery}"...`, threadID);
 
-    // ننشئ 4 روابط بـ seeds مختلفة
-    const urls       = await searchImages(engQuery, 4);
+    const results = await searchImages(engQuery, 40);
     const validPaths = [];
+    const usedSources = [];
 
-    for (const url of urls) {
-      const p = await downloadImage(url);
-      if (p) validPaths.push(p);
+    for (const image of results) {
+      const p = await downloadImage(image);
+      if (p) {
+        validPaths.push(p);
+        usedSources.push(image);
+        if (validPaths.length === 6) break;
+      }
     }
 
     if (!validPaths.length)
@@ -44,7 +48,13 @@ module.exports = {
     try {
       await api.sendMessage(
         {
-          body:       `🖼️ ${validPaths.length} صور لـ "${arabicQuery}"`,
+          body: [
+            `🖼️ ${validPaths.length} صور مرتبطة بـ "${arabicQuery}"`,
+            ...usedSources.map((image, index) =>
+              `${index + 1}. ${image.title}${image.attribution ? ` (${image.attribution})` : ""}${image.sourceURL ? ` — ${image.sourceURL}` : ""}`
+            ),
+            "المصدر: Wikimedia Commons",
+          ].join("\n"),
           attachment: validPaths.map((p) => fs.createReadStream(p)),
         },
         threadID

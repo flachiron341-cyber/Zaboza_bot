@@ -6,6 +6,7 @@ const handler = require("./handler");
 const logger  = require("./utils/logger");
 const state   = require("./state");
 const { parseCookieString } = require("./utils/parseCookies");
+const groupEventImages = require("./utils/groupEventImages");
 
 // ===== مسارات الملفات =====
 const appstateSecretName = "FACEBOOK_APPSTATE";
@@ -113,8 +114,9 @@ function formatLoginError(err) {
   return details[0] || "تعذر تحديد سبب الخطأ";
 }
 
-function sendGroupEventImage(api, threadID, filename) {
-  const imagePath = path.join(groupEventImageDir, filename);
+function sendGroupEventImage(api, threadID, filename, slot) {
+  const configuredPath = slot ? groupEventImages.getImagePath(threadID, slot) : null;
+  const imagePath = configuredPath || path.join(groupEventImageDir, filename);
   if (!fs.existsSync(imagePath)) {
     logger.warn(`صورة حدث القروب غير موجودة: ${filename}`);
     return;
@@ -281,47 +283,14 @@ function startBot(api) {
       // عند خروج البوت نفسه لا يمكن إرسال صورة بعد مغادرته، كما أن ذلك
       // كان سبب خطأ Messenger 1545012 في السجل.
       if (leftID !== String(botID)) {
-        sendGroupEventImage(api, threadID, "1788550124005.jpg");
+        sendGroupEventImage(api, threadID, "1788550124005.jpg", "leave");
       }
     }
     if (logMessageType === "log:subscribe") {
       const addedIDs = (event.logMessageData?.addedParticipants || []).map(participantID);
-      const image = addedIDs.includes(String(botID))
-        ? "bot-joined.jpg"
-        : "1788550142034.jpg";
-      sendGroupEventImage(api, threadID, image);
-    }
-
-    const nicknameProtection = state.nicknameProtectionState.get(threadID);
-
-    if (nicknameProtection?.active && logMessageType === "log:subscribe") {
-      const added = event.logMessageData?.addedParticipants || [];
-      for (const participant of added) {
-        const uid = participantID(participant);
-        if (uid) nicknameProtection.nicknames.set(uid, "");
-      }
-      state.persistNicknameProtection(threadID);
-    }
-
-    if (nicknameProtection?.active && logMessageType === "log:unsubscribe") {
-      const uid = String(event.logMessageData?.leftParticipantFbId || "");
-      if (uid) {
-        nicknameProtection.nicknames.delete(uid);
-        state.persistNicknameProtection(threadID);
-      }
-    }
-
-    if (nicknameProtection?.active && logMessageType === "log:user-nickname") {
-      const changedUID = String(event.logMessageData?.participant_id || "");
-      if (changedUID && nicknameProtection.nicknames.has(changedUID)) {
-        const savedNick = nicknameProtection.nicknames.get(changedUID) || "";
-        logger.info(`🛡 إعادة كنية ${changedUID} إلى "${savedNick}"`);
-        setTimeout(() => {
-          api.setNickname(savedNick, threadID, changedUID, (err) => {
-            if (!err) logger.info(`✅ أُعيدت كنية ${changedUID}`);
-          });
-        }, 500);
-      }
+      const isBotJoin = addedIDs.includes(String(botID));
+      const image = isBotJoin ? "bot-joined.jpg" : "1788550142034.jpg";
+      sendGroupEventImage(api, threadID, image, isBotJoin ? "botJoin" : "join");
     }
 
     const protection = state.protectionState.get(threadID);
@@ -358,18 +327,6 @@ function startBot(api) {
 
     if (!protection || !protection.active) return;
 
-    if (logMessageType === "log:user-nickname") {
-      const changedUID = event.logMessageData && String(event.logMessageData.participant_id || "");
-      if (changedUID && protection.nicknames && protection.nicknames.has(changedUID)) {
-        const savedNick = protection.nicknames.get(changedUID);
-        logger.info(`🛡 تغيير كنية ${changedUID} → إعادتها: "${savedNick}"`);
-        setTimeout(() => {
-          api.setNickname(savedNick, threadID, changedUID, (err) => {
-            if (!err) logger.info(`✅ أُعيدت كنية ${changedUID}: "${savedNick}"`);
-          });
-        }, 1500);
-      }
-    }
   }
 }
 

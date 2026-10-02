@@ -4,45 +4,34 @@ module.exports = {
   config: {
     name: "استخدام",
     aliases: ["use", "access"],
-    description: "يحدد من يستطيع استخدام البوت في هذا القروب",
-    usage: "!استخدام المطور | !استخدام الجميع | !استخدام (رد على شخص)",
+    description: "يقفل الاستخدام للمطورين أو يمنح عضواً محدداً صلاحية في القروب",
+    usage: "!استخدام المطور | !استخدام (رد على شخص) | !استخدام سحب (رد)",
     cooldown: 3,
-    adminOnly: false,
+    adminOnly: true,
   },
 
   async run({ api, event, args, messageReply, config }) {
     const threadID = String(event.threadID);
-    const senderID = String(event.senderID);
-    const developerID = String(config.adminUIDs?.[0] || "");
-
-    if (senderID !== developerID) {
-      return api.sendMessage("🚫 هذا الأمر متاح للمطور فقط.", threadID);
-    }
-
     const choice = String(args[0] || "").toLowerCase();
 
     if (choice === "المطور" || choice === "developer" || choice === "dev") {
       usageAccess.setMode(threadID, "developer");
       return api.sendMessage(
-        "🔒 تم تفعيل وضع المطور.\nالآن المطور فقط يستطيع استخدام البوت في هذا القروب.",
+        "🔒 تم قفل استخدام البوت للمطورين فقط في هذا القروب.",
         threadID
       );
     }
 
-    if (choice === "الجميع" || choice === "الكل" || choice === "all") {
-      usageAccess.setMode(threadID, "all");
-      return api.sendMessage(
-        "🔓 تم تفعيل وضع الجميع.\nالآن جميع أعضاء القروب يستطيعون استخدام البوت.",
-        threadID
-      );
+    if (["الجميع", "الكل", "all"].includes(choice)) {
+      return api.sendMessage("🚫 الاستخدام المفتوح للجميع معطّل. امنح الصلاحية لكل شخص بالرد على رسالته.", threadID);
     }
 
     if (!messageReply) {
       return api.sendMessage(
         "❌ استخدم أحد الخيارات:\n" +
         "• !استخدام المطور\n" +
-        "• !استخدام الجميع\n" +
-        "• !استخدام (رد على رسالة الشخص)",
+        "• !استخدام (رد على رسالة الشخص لمنحه الصلاحية)\n" +
+        "• !استخدام سحب (رد على رسالة الشخص لإلغاء الصلاحية)",
         threadID
       );
     }
@@ -50,6 +39,14 @@ module.exports = {
     const targetID = String(messageReply.senderID || "");
     if (!targetID) {
       return api.sendMessage("❌ لم أستطع معرفة صاحب الرسالة التي رددت عليها.", threadID);
+    }
+
+    if (choice === "سحب" || choice === "إزالة" || choice === "remove") {
+      const removed = usageAccess.revokeUser(threadID, targetID);
+      return api.sendMessage(
+        removed ? `🔒 أُلغيت صلاحية ${targetID}.` : `ℹ️ لم تكن لدى ${targetID} صلاحية إضافية.`,
+        threadID
+      );
     }
 
     usageAccess.grantUser(threadID, targetID);

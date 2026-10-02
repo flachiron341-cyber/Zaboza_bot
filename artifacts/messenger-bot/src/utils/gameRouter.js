@@ -106,7 +106,8 @@ async function handleNextMessage(api, event, prefix = "!") {
   const senderID = String(event.senderID || "");
   const key = userKey(threadID, senderID);
   const body = String(event.body || "").trim();
-  if (!body || body.startsWith(String(prefix))) return false;
+  const prefixes = Array.isArray(prefix) ? prefix.map(String) : [String(prefix)];
+  if (!body || prefixes.some((item) => item && body.startsWith(item))) return false;
 
   const handlers = [
     [state.guessGames, handleGuess],

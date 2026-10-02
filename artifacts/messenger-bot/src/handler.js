@@ -4,6 +4,9 @@ const logger = require("./utils/logger");
 const state  = require("./state");
 const usageAccess = require("./utils/usageAccess");
 const { handleNextMessage } = require("./utils/gameRouter");
+const permissions = require("./utils/permissions");
+const { getPrefixes, parseCommand } = require("./utils/prefixes");
+const { info } = require("./utils/brand");
 
 // ===== تحميل الأوامر =====
 const commands = new Map();
@@ -49,25 +52,28 @@ function normalizeEvent(event) {
 async function handleMessage(api, rawEvent, config, botID) {
   const event = normalizeEvent(rawEvent);
   const { senderID, threadID, body, messageReply } = event;
-  const developerID = String(config.adminUIDs?.[0] || "");
+  const developerIDs = permissions.getDeveloperIDs();
   state.stats.messagesReceived++;
 
   // لا نرسل ردوداً تلقائية أو إجابات ألعاب أو رسائل صلاحية
   // لأي عضو غير مسموح له باستخدام البوت.
-  if (!usageAccess.isAllowed(threadID, senderID, developerID)) return;
+  if (!usageAccess.isAllowed(threadID, senderID, developerIDs)) return;
 
   state.rememberMessage(event);
 
-  const autoReplyWords = ["انس", "انسة", "زينون", "زينونة"];
+  const autoReplyWords = ["زينون", "انس", "انسة", "نوسة"];
+  const escapedWords = autoReplyWords.map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const autoReplyPattern = new RegExp(
+    `(^|[^\\p{L}\\p{N}_])(?:${escapedWords.join("|")})(?=$|[^\\p{L}\\p{N}_])`,
+    "u"
+  );
   if (
     event.isGroup &&
     body &&
-    autoReplyWords.some((word) => body.includes(word))
+    state.autoReplySettings.enabled &&
+    autoReplyPattern.test(String(body))
   ) {
-    return api.sendMessage(
-      "ماذا تريد امك من نياک امها يا ولد لقحـبة🤮🖕🏿🍆هل تريد ان تمصه له يا قرد🤓🫦⛩️",
-      threadID
-    );
+    return api.sendMessage(info("رد تلقائي", [state.autoReplySettings.response]), threadID);
   }
 
   // ── إجابات الألعاب القديمة (بالرد على رسالة البوت) ──
@@ -89,32 +95,22 @@ async function handleMessage(api, rawEvent, config, botID) {
   }
 
   // الألعاب الجديدة تستقبل الرسالة التالية للمستخدم حتى بدون رد مباشر.
-  if (body && await handleNextMessage(api, event, config.prefix)) return;
+  if (body && await handleNextMessage(api, event, getPrefixes(config))) return;
 
-  if (!body || !body.startsWith(config.prefix)) return;
-
-  const args        = body.slice(config.prefix.length).trim().split(/\s+/);
-  const commandName = args.shift().toLowerCase();
+  const parsed = parseCommand(body, config);
+  if (!parsed) return;
+  const { args, name: commandName } = parsed;
 
   if (!commands.has(commandName)) return;
 
   const command = commands.get(commandName);
 
   // صلاحية استخدام البوت حسب إعداد هذا القروب.
-  if (!usageAccess.isAllowed(threadID, senderID, developerID)) {
-    return api.sendMessage(
-      "🚫 لا تملك صلاحية استخدام البوت في هذا القروب.\n" +
-      "📌 اطلب من المطور تفعيلك بأمر !استخدام بالرد على رسالتك.",
-      threadID
-    );
+  if (command.config.rootOnly && !permissions.isRootDeveloper(senderID)) {
+    return api.sendMessage("🚫 هذا الأمر للمطور الرئيسي فقط.", threadID);
   }
-
-  // صلاحيات الأدمن
-  if (
-    command.config.adminOnly &&
-    !(config.adminUIDs || []).some((id) => String(id) === String(senderID))
-  ) {
-    return api.sendMessage("🚫 هذا الأمر للمشرفين فقط.", threadID);
+  if (command.config.adminOnly && !permissions.isDeveloper(senderID)) {
+    return api.sendMessage("🚫 هذا الأمر للمطورين فقط.", threadID);
   }
 
   // نظام التهدئة
@@ -136,8 +132,11 @@ async function handleMessage(api, rawEvent, config, botID) {
   // تنفيذ الأمر
   state.stats.commandsProcessed++;
   try {
-    logger.info(`▶ ${senderID} → ${config.prefix}${commandName} ${args.join(" ")}`);
-    await command.run({ api, event, args, config, botID, commands, messageReply });
+      logger.info(`▶ ${senderID} → ${parsed.prefix}${commandName}`);
+      await command.run({
+        api, event, args, config, botID, commands, messageReply,
+        invokedName: commandName, prefix: parsed.prefix,
+      });
   } catch (err) {
     state.stats.commandFailures++;
     logger.error(`خطأ في أمر ${commandName}: ${err.message}`);
@@ -147,20 +146,16 @@ async function handleMessage(api, rawEvent, config, botID) {
 
 async function handleUnsend(api, rawEvent, config) {
   const event = normalizeEvent(rawEvent);
-  const developerID = String(config?.adminUIDs?.[0] || "");
-  if (!usageAccess.isAllowed(event.threadID, event.senderID, developerID)) return;
+  if (!usageAccess.isAllowed(
+    event.threadID,
+    event.senderID,
+    permissions.getDeveloperIDs()
+  )) return;
+  if (!state.autoReplySettings.enabled || !state.autoReplySettings.response) return;
 
-  const deleted = state.messageHistory.get(String(event.messageID || ""));
-  const body = deleted?.body || "تعذر حفظ نص الرسالة قبل حذفها.";
-  const senderID = String(event.senderID || deleted?.senderID || "");
-  const profileURL = senderID
-    ? `https://www.facebook.com/profile.php?id=${senderID}`
-    : "غير متوفر";
-
+  // لا نعيد نشر محتوى اختار صاحبه سحبه من المحادثة.
   await api.sendMessage(
-    `كشفتلك يا نخش علاش تحذف نكمك\n` +
-    `الرسالة المحذوفة هي: ${body}\n` +
-    `رابط حسابه: ${profileURL}`,
+    info("رد تلقائي", [state.autoReplySettings.response]),
     String(event.threadID)
   );
 }

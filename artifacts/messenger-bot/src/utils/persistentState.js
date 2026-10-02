@@ -21,28 +21,6 @@ function writeState() {
   fs.writeFileSync(statePath, JSON.stringify(data, null, 2), "utf8");
 }
 
-function getNicknameProtections() {
-  return data.nicknameProtections && typeof data.nicknameProtections === "object"
-    ? data.nicknameProtections
-    : {};
-}
-
-function saveNicknameProtection(threadID, nicknames) {
-  data.nicknameProtections = getNicknameProtections();
-  data.nicknameProtections[String(threadID)] = {
-    nicknames: Object.fromEntries(
-      [...nicknames.entries()].map(([uid, nickname]) => [String(uid), nickname ?? ""])
-    ),
-  };
-  writeState();
-}
-
-function removeNicknameProtection(threadID) {
-  data.nicknameProtections = getNicknameProtections();
-  delete data.nicknameProtections[String(threadID)];
-  writeState();
-}
-
 function getAttackDelays() {
   return data.attackDelays && typeof data.attackDelays === "object"
     ? data.attackDelays
@@ -68,10 +46,6 @@ function saveGroupProtection(threadID, protection) {
   data.groupProtections = getGroupProtections();
   data.groupProtections[String(threadID)] = {
     name: String(protection.name || ""),
-    nicknames: Object.fromEntries(
-      [...(protection.nicknames || new Map()).entries()]
-        .map(([uid, nickname]) => [String(uid), nickname ?? ""])
-    ),
   };
   writeState();
 }
@@ -106,6 +80,40 @@ function getCreatedGroups() {
     : {};
 }
 
+function getAutoReply() {
+  const saved = data.autoReply && typeof data.autoReply === "object" ? data.autoReply : {};
+  return {
+    enabled: Boolean(saved.enabled),
+    response: String(saved.response || ""),
+  };
+}
+
+function saveAutoReply(settings) {
+  data.autoReply = {
+    enabled: Boolean(settings?.enabled),
+    response: String(settings?.response || ""),
+  };
+  writeState();
+}
+
+function getGroupEventImages() {
+  return data.groupEventImages && typeof data.groupEventImages === "object"
+    ? data.groupEventImages
+    : {};
+}
+
+function getGroupEventImage(threadID, slot) {
+  return String(getGroupEventImages()[String(threadID)]?.[String(slot)] || "");
+}
+
+function saveGroupEventImage(threadID, slot, filename) {
+  const id = String(threadID);
+  const images = getGroupEventImages();
+  images[id] = { ...(images[id] || {}), [String(slot)]: String(filename) };
+  data.groupEventImages = images;
+  writeState();
+}
+
 function getCreatedGroup(key) {
   return getCreatedGroups()[String(key)] || null;
 }
@@ -118,8 +126,6 @@ function saveCreatedGroup(key, threadID) {
 
 module.exports = {
   readState,
-  saveNicknameProtection,
-  removeNicknameProtection,
   getAttackDelays,
   saveAttackDelay,
   getGroupProtections,
@@ -128,6 +134,10 @@ module.exports = {
   getNameProtections,
   saveNameProtection,
   removeNameProtection,
+  getAutoReply,
+  saveAutoReply,
+  getGroupEventImage,
+  saveGroupEventImage,
   getCreatedGroup,
   saveCreatedGroup,
 };

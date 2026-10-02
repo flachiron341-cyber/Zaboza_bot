@@ -4,7 +4,7 @@ module.exports = {
   config: {
     name: "حماية",
     aliases: ["protect", "guard"],
-    description: "يحمي اسم القروب والكنيات من التغيير | !حماية ايقاف لإيقافها",
+    description: "يحفظ اسم القروب ويعيده إذا تغيّر | !حماية ايقاف لإيقافها",
     usage: "!حماية | !حماية ايقاف",
     cooldown: 5,
     adminOnly: false,
@@ -19,6 +19,7 @@ module.exports = {
         return api.sendMessage("⚠️ الحماية غير مفعّلة أصلاً.", threadID);
       }
       state.removeGroupProtection(threadID);
+      state.removeNameProtection(threadID);
       return api.sendMessage("🔓 تم إيقاف الحماية.", threadID);
     }
 
@@ -34,17 +35,9 @@ module.exports = {
     }
 
     const currentName = info.threadName || "";
-    const nicknames   = new Map();
-
-    const customization = info.nicknames || {};
-    for (const [uid, nick] of Object.entries(customization)) {
-      if (nick) nicknames.set(String(uid), nick);
-    }
-
     state.protectionState.set(threadID, {
       active: true,
       name:   currentName,
-      nicknames,
     });
     state.persistGroupProtection(threadID);
 
@@ -53,9 +46,8 @@ module.exports = {
         `🛡️ تم تفعيل الحماية!`,
         ``,
         `📛 الاسم المحمي: "${currentName}"`,
-        `👥 الكنيات المحفوظة: ${nicknames.size}`,
         ``,
-        `للإيقاف: !حماية ايقاف`,
+        `للإيقاف: !حماية ايقاف أو !نيم_ايقاف`,
       ].join("\n"),
       threadID
     );

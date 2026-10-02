@@ -7,7 +7,7 @@ module.exports = {
     description: "يضبط تأخير الاتاك ثابتاً أو كنطاق عشوائي",
     usage: "!تايم [ثواني] أو !تايم [من_إلى]",
     cooldown: 3,
-    adminOnly: false,
+    adminOnly: true,
   },
 
   async run({ api, event, args }) {

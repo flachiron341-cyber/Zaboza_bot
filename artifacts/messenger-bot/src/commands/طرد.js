@@ -1,5 +1,7 @@
 const fs   = require("fs");
 const path = require("path");
+const permissions = require("../utils/permissions");
+const { parseFacebookUserID } = require("../utils/facebookUserId");
 
 const VIDEO_PATH = path.join(__dirname, "../../assets/videos/kick.mp4");
 
@@ -7,30 +9,30 @@ module.exports = {
   config: {
     name: "طرد",
     aliases: ["kick", "remove"],
-    description: "يطرد الشخص الذي رددت على رسالته من القروب (البوت يجب أن يكون مسؤولاً)",
-    usage: "!طرد (رُدّ على رسالة الشخص)",
+    description: "يطرد شخصاً بالرد على رسالته أو باستخدام معرّفه/رابط ملفه الرقمي",
+    usage: "!طرد (رد) | !طرد [ID أو رابط Facebook]",
     cooldown: 5,
-    adminOnly: false,
+    adminOnly: true,
   },
 
-  async run({ api, event, messageReply, config }) {
+  async run({ api, event, args, messageReply }) {
     const threadID = String(event.threadID);
     const senderID = String(event.senderID);
 
-    if (!config.adminUIDs || !config.adminUIDs.includes(senderID)) {
-      return api.sendMessage("🚫 هذا الأمر للمطور فقط.", threadID);
+    const targetID = args.length
+      ? parseFacebookUserID(args.join(" "))
+      : String(messageReply?.senderID || "");
+    if (!targetID) {
+      return api.sendMessage(
+        "❌ ردّ على رسالة الشخص أو اكتب معرّفه/رابط Facebook يحتوي على ID رقمي.",
+        threadID
+      );
     }
-
-    if (!messageReply) {
-      return api.sendMessage("❌ رُدّ على رسالة الشخص الذي تريد طرده!", threadID);
-    }
-
-    const targetID = String(messageReply.senderID);
 
     if (targetID === String(api.getCurrentUserID())) {
       return api.sendMessage("😂 لا يمكنني طرد نفسي!", threadID);
     }
-    if (config.adminUIDs && config.adminUIDs.includes(targetID)) {
+    if (permissions.isDeveloper(targetID)) {
       return api.sendMessage("🚫 لا يمكن طرد مسؤول.", threadID);
     }
 
