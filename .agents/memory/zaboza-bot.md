@@ -15,7 +15,7 @@ description: بوت فيسبوك مسنجر عربي — هيكله وقرارا
 - `src/utils/translate.js` — قاموس عربي→إنجليزي لـ loremflickr
 
 ## config.json
-- `adminUIDs`: ["61592570080622"] — ID المطور
+- `adminUIDs`: ["61594304253023"] — ID المطور
 - `prefix`: "!"
 
 ## الأوامر (22)

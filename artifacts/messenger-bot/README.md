@@ -1,6 +1,6 @@
 # 🤖 بوت فيسبوك مسنجر عربي
 
-بوت مسنجر بالبادئة `!` مبني على مكتبة `ws3-fca`.
+بوت مسنجر بالبادئة `🔖` مبني على مكتبة `ws3-fca`.
 
 ---
 
@@ -23,7 +23,7 @@ appstate.json
 عدّل `config.json` كما تريد:
 ```json
 {
-  "prefix": "!",
+  "prefix": "🔖",
   "botName": "بوتي",
   "adminUIDs": ["YOUR_UID_HERE"],
   "cooldown": 3
