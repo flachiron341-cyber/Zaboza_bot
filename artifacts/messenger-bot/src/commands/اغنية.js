@@ -1,13 +1,13 @@
 const fs = require("fs");
 const logger = require("../utils/logger");
-const { searchSong, downloadSongPreview } = require("../utils/music");
+const { searchFreeAudio, downloadFreeAudio, searchSong, downloadSongPreview } = require("../utils/music");
 
 module.exports = {
   config: {
     name: "اغنية",
     aliases: ["اغنيه", "song", "music"],
-    description: "يبحث عن الأغنية ويرسلها كرسالة صوتية",
-    usage: "!اغنية [اسم الأغنية]",
+    description: "يرسل الصوت الكامل إذا كان مرخّصاً للمشاركة، وإلا يعرض معاينة ورابط المصدر",
+    usage: "!اغنية [اسم أغنية أو صوت]",
     cooldown: 20,
     adminOnly: false,
   },
@@ -17,19 +17,56 @@ module.exports = {
     const query = args.join(" ").trim();
     if (!query) return api.sendMessage("❌ اكتب اسم الأغنية.", threadID);
 
-    await api.sendMessage(`🎵 جاري البحث عن "${query}"...`, threadID);
+    await api.sendMessage(`🔎 جاري البحث عن صوت قابل للمشاركة: "${query}"...`, threadID);
     let audioPath = null;
 
     try {
+      let freeAudio = null;
+      try {
+        freeAudio = await searchFreeAudio(query);
+      } catch (error) {
+        logger.warn(`تعذر البحث في الصوتيات المرخصة: ${error?.message || error}`);
+      }
+      if (freeAudio) {
+        audioPath = await downloadFreeAudio(freeAudio);
+        if (!audioPath) {
+          return api.sendMessage(
+            `وجدت ملفاً مرخّصاً لكن حجمه يتجاوز حد الإرسال أو تعذّر تنزيله:\n${freeAudio.title}\n${freeAudio.sourceURL}`,
+            threadID
+          );
+        }
+        const attribution = [
+          freeAudio.artist ? `الفنان: ${freeAudio.artist}` : "",
+          `الرخصة: ${freeAudio.license}`,
+          freeAudio.sourceURL ? `المصدر: ${freeAudio.sourceURL}` : "",
+        ].filter(Boolean).join("\n");
+        await api.sendMessage(
+          {
+            body: `🔊 ${freeAudio.title}\n${attribution}`,
+            attachment: fs.createReadStream(audioPath),
+          },
+          threadID
+        );
+        return;
+      }
+
       const result = await searchSong(query);
-      if (!result) return api.sendMessage("❌ لم أجد معاينة صوتية لهذه الأغنية.", threadID);
+      if (!result) {
+        return api.sendMessage(
+          "❌ لم أجد ملفاً صوتياً مرخّصاً أو معاينة لهذه العبارة. جرّب وصفاً أبسط، مثل: rain sound.",
+          threadID
+        );
+      }
 
       audioPath = await downloadSongPreview(result.preview);
       if (!audioPath) return api.sendMessage("❌ تعذر تحميل المعاينة الصوتية.", threadID);
 
       await api.sendMessage(
         {
-          body: `🎧 ${result.title} — ${result.artist}\n(معاينة صوتية متاحة من المصدر)`,
+          body:
+            `🎧 ${result.title} — ${result.artist}\n` +
+            "المرفق معاينة قصيرة من Deezer؛ لا أرسل نسخة كاملة من أغنية محمية بحقوق النشر.\n" +
+            `للاستماع إلى المصدر كاملاً: ${result.link || `https://www.deezer.com/search/${encodeURIComponent(query)}`}`,
           attachment: fs.createReadStream(audioPath),
         },
         threadID

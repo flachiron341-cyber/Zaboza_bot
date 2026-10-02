@@ -40,7 +40,7 @@ module.exports = {
   // تأخير الاتاك لكل قروب — key: threadID, value: { min, max } بالثواني
   attackDelay,
 
-  // حماية اسم القروب والكنيات — key: threadID, value: { active, name, nicknames: Map }
+  // حماية اسم القروب — key: threadID, value: { active, name }
   protectionState,
 
   // حماية اسم القروب التي يفعّلها أمر !نيم.

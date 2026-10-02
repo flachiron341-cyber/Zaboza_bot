@@ -1,3 +1,4 @@
 - [ws3-fca API quirks](ws3-fca-api.md) — sendMessage لا يقبل callback؛ gcname/setNickname/gcmember هي الأسماء الصحيحة
 - [zaboza bot structure](zaboza-bot.md) — بوت مسنجر عربي، handler.js يُطبّع كل IDs
 - [Messenger game sessions](game-sessions.md) — الألعاب التي تنتظر رسالة لاحقة تحتاج مفتاح القروب+المستخدم وتنظيفاً مؤقتاً وإلغاءً فورياً
+- [Messenger media limits](messenger-media-limits.md) — ميزات البوت تبقى بلا مفاتيح API؛ لا توجد دالة مدعومة لتغيير صورة القروب في ws3-fca
