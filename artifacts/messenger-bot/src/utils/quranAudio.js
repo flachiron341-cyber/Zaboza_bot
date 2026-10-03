@@ -131,7 +131,7 @@ function splitSurahForMessenger(audio) {
   const parts = [];
   let partStart = 0;
   while (buffer.length - partStart > maxPartBytes) {
-    const boundary = findNextMp3Frame(buffer, partStart + maxPartBytes);
+    const boundary = findNextMp3Frame(buffer, partStart + maxPartBytes - 64 * 1024);
     if (boundary <= partStart) throw new Error("تعذر العثور على حدّ صالح بين إطارات MP3.");
     const partPath = path.join(audio.directory, `part-${String(parts.length + 1).padStart(3, "0")}.mp3`);
     fs.writeFileSync(partPath, buffer.subarray(partStart, boundary));
