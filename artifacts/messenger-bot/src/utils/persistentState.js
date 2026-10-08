@@ -80,22 +80,6 @@ function getCreatedGroups() {
     : {};
 }
 
-function getAutoReply() {
-  const saved = data.autoReply && typeof data.autoReply === "object" ? data.autoReply : {};
-  return {
-    enabled: Boolean(saved.enabled),
-    response: String(saved.response || ""),
-  };
-}
-
-function saveAutoReply(settings) {
-  data.autoReply = {
-    enabled: Boolean(settings?.enabled),
-    response: String(settings?.response || ""),
-  };
-  writeState();
-}
-
 function getGroupEventImages() {
   return data.groupEventImages && typeof data.groupEventImages === "object"
     ? data.groupEventImages
@@ -111,6 +95,37 @@ function saveGroupEventImage(threadID, slot, filename) {
   const images = getGroupEventImages();
   images[id] = { ...(images[id] || {}), [String(slot)]: String(filename) };
   data.groupEventImages = images;
+  writeState();
+}
+
+function getGroupEventImagesEnabled() {
+  return data.groupEventImagesEnabled && typeof data.groupEventImagesEnabled === "object"
+    ? data.groupEventImagesEnabled
+    : {};
+}
+
+function saveGroupEventImagesEnabled(threadID, enabled) {
+  data.groupEventImagesEnabled = getGroupEventImagesEnabled();
+  data.groupEventImagesEnabled[String(threadID)] = Boolean(enabled);
+  writeState();
+}
+
+function getCommandPrefixSettings() {
+  const saved = data.commandPrefixSettings && typeof data.commandPrefixSettings === "object"
+    ? data.commandPrefixSettings
+    : {};
+  return {
+    primary: String(saved.primary || ""),
+    prefixes: Array.isArray(saved.prefixes) ? saved.prefixes.map(String) : [],
+  };
+}
+
+function saveCommandPrefixSettings(settings) {
+  const prefixes = [...new Set((settings?.prefixes || []).map((prefix) => String(prefix).trim()).filter(Boolean))];
+  data.commandPrefixSettings = {
+    primary: String(settings?.primary || prefixes[0] || ""),
+    prefixes,
+  };
   writeState();
 }
 
@@ -134,10 +149,12 @@ module.exports = {
   getNameProtections,
   saveNameProtection,
   removeNameProtection,
-  getAutoReply,
-  saveAutoReply,
   getGroupEventImage,
   saveGroupEventImage,
+  getGroupEventImagesEnabled,
+  saveGroupEventImagesEnabled,
+  getCommandPrefixSettings,
+  saveCommandPrefixSettings,
   getCreatedGroup,
   saveCreatedGroup,
 };

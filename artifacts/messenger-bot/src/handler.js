@@ -55,26 +55,11 @@ async function handleMessage(api, rawEvent, config, botID) {
   const developerIDs = permissions.getDeveloperIDs();
   state.stats.messagesReceived++;
 
-  // لا نرسل ردوداً تلقائية أو إجابات ألعاب أو رسائل صلاحية
+  // لا نرسل إجابات ألعاب أو رسائل صلاحية
   // لأي عضو غير مسموح له باستخدام البوت.
   if (!usageAccess.isAllowed(threadID, senderID, developerIDs)) return;
 
   state.rememberMessage(event);
-
-  const autoReplyWords = ["زينون", "انس", "انسة", "نوسة"];
-  const escapedWords = autoReplyWords.map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  const autoReplyPattern = new RegExp(
-    `(^|[^\\p{L}\\p{N}_])(?:${escapedWords.join("|")})(?=$|[^\\p{L}\\p{N}_])`,
-    "u"
-  );
-  if (
-    event.isGroup &&
-    body &&
-    state.autoReplySettings.enabled &&
-    autoReplyPattern.test(String(body))
-  ) {
-    return api.sendMessage(info("رد تلقائي", [state.autoReplySettings.response]), threadID);
-  }
 
   // ── إجابات الألعاب القديمة (بالرد على رسالة البوت) ──
   if (messageReply && body) {
@@ -144,21 +129,7 @@ async function handleMessage(api, rawEvent, config, botID) {
   }
 }
 
-async function handleUnsend(api, rawEvent, config) {
-  const event = normalizeEvent(rawEvent);
-  if (!usageAccess.isAllowed(
-    event.threadID,
-    event.senderID,
-    permissions.getDeveloperIDs()
-  )) return;
-  if (!state.autoReplySettings.enabled || !state.autoReplySettings.response) return;
-
-  // لا نعيد نشر محتوى اختار صاحبه سحبه من المحادثة.
-  await api.sendMessage(
-    info("رد تلقائي", [state.autoReplySettings.response]),
-    String(event.threadID)
-  );
-}
+async function handleUnsend() {}
 
 // ===== معالج إجابات الألعاب =====
 async function processGameAnswer(api, event, session, type) {

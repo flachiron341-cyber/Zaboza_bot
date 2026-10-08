@@ -24,7 +24,7 @@ function canRedistribute(licenseValue) {
     .replace(/\s+/g, " ")
     .trim();
   return (
-    license.includes("public domain") ||
+    license.startsWith("public domain") ||
     license.startsWith("cc0") ||
     /^cc by(?: sa)?(?: \d|$)/.test(license)
   );

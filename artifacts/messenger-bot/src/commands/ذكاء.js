@@ -4,14 +4,14 @@ const { info, error } = require("../utils/brand");
 module.exports = {
   config: {
     name: "ذكاء",
-    aliases: ["ai", "مساعد", "اسأل", "دارجة", "ذكاء_جزائري"],
+    aliases: ["ai", "مساعد", "اسأل"],
     description: "بحث معرفي مختصر من مصادر عامة، من دون مفتاح API",
-    usage: "!ذكاء [سؤالك] | !دارجة [سؤالك]",
+    usage: "!ذكاء [سؤالك]",
     cooldown: 8,
     adminOnly: false,
   },
 
-  async run({ api, event, args, config, invokedName }) {
+  async run({ api, event, args }) {
     const threadID = String(event.threadID);
     const question = args.join(" ").trim();
     if (!question) {
@@ -26,10 +26,9 @@ module.exports = {
           threadID
         );
       }
-      const dialect = ["دارجة", "ذكاء_جزائري"].includes(String(invokedName || ""));
       const lines = [
         `السؤال: ${question}`,
-        dialect ? "هاك وش لقيت في المصادر:" : "ملخص من نتائج المصادر العامة:",
+        "ملخص من نتائج المصادر العامة:",
         ...results.slice(0, 3).map((item, index) =>
           `${index + 1}. ${item.title}\n${item.snippet || "لا يتوفر ملخص."}${item.url ? `\n${item.url}` : ""}`
         ),

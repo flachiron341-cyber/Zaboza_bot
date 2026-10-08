@@ -1,4 +1,5 @@
 const persistentState = require("../utils/persistentState");
+const { sendWithTyping } = require("../utils/typingBehavior");
 
 module.exports = {
   config: {
@@ -7,7 +8,7 @@ module.exports = {
     description: "ينشئ مجموعة خاصة مع الشخص الذي رددت على رسالته",
     usage: "!مجموعة (بالرد على رسالة)",
     cooldown: 10,
-    adminOnly: false,
+    adminOnly: true,
   },
 
   async run({ api, event, messageReply }) {
@@ -22,13 +23,20 @@ module.exports = {
     const key = `${senderID}:${targetID}`;
     const existing = persistentState.getCreatedGroup(key);
     if (existing) {
+      try {
+        await api.gcmember("add", senderID, String(existing));
+      } catch {}
       return api.sendMessage(`ℹ️ تم إنشاء مجموعتكما سابقاً.\nمعرّف المجموعة: ${existing}`, threadID);
     }
 
     try {
-      const created = await api.sendMessage(
-        "👥 تم إنشاء المجموعة الخاصة بكما.",
-        [targetID]
+      const created = await sendWithTyping(
+        api,
+        threadID,
+        () => api.sendMessage(
+          "👥 تم إنشاء المجموعة الخاصة بالمطوّر والعضو.",
+          [...new Set([senderID, targetID])]
+        )
       );
       const newThreadID = String(created?.threadID || "");
       if (!newThreadID) {

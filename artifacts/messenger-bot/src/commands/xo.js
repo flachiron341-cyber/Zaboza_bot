@@ -38,7 +38,7 @@ module.exports = {
     name: "xo",
     aliases: ["اكسو", "tic", "تيك"],
     description: "لعبة XO بين لاعبين",
-    usage: "!xo | !xo انضم | !xo 5 | !xo الغاء",
+    usage: "!xo | !xo انضم (أو !xo للاعب الثاني) | !xo 5 | !xo الغاء",
     cooldown: 0,
     adminOnly: false,
   },
@@ -87,9 +87,11 @@ module.exports = {
       );
     }
 
-    if (action === "انضم") {
+    if (action === "انضم" || (!action && match.status === "waiting" && senderID !== match.playerX)) {
       if (match.status !== "waiting") return api.sendMessage(error("المباراة بدأت", ["لا يمكن الانضمام بعد بدء اللعب."]), threadID);
       if (senderID === match.playerX) return api.sendMessage(error("لا يمكنك الانضمام لنفسك", ["انتظر لاعباً ثانياً."]), threadID);
+      if (match.timer) clearTimeout(match.timer);
+      match.timer = null;
       match.playerO = senderID;
       match.status = "playing";
       match.turn = match.playerX;

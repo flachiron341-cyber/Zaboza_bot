@@ -1,9 +1,6 @@
-const fs   = require("fs");
-const path = require("path");
 const permissions = require("../utils/permissions");
 const { parseFacebookUserID } = require("../utils/facebookUserId");
-
-const VIDEO_PATH = path.join(__dirname, "../../assets/videos/kick.mp4");
+const logger = require("../utils/logger");
 
 module.exports = {
   config: {
@@ -22,55 +19,18 @@ module.exports = {
     const targetID = args.length
       ? parseFacebookUserID(args.join(" "))
       : String(messageReply?.senderID || "");
-    if (!targetID) {
-      return api.sendMessage(
-        "❌ ردّ على رسالة الشخص أو اكتب معرّفه/رابط Facebook يحتوي على ID رقمي.",
-        threadID
-      );
-    }
+    if (!targetID) return;
 
-    if (targetID === String(api.getCurrentUserID())) {
-      return api.sendMessage("😂 لا يمكنني طرد نفسي!", threadID);
-    }
-    if (permissions.isDeveloper(targetID)) {
-      return api.sendMessage("🚫 لا يمكن طرد مسؤول.", threadID);
-    }
-
-    // طرد العضو — نتعامل مع كلا نوعي الأخطاء
-    let success = false;
-    let errMsg  = "";
+    if (targetID === String(api.getCurrentUserID())) return;
+    if (permissions.isDeveloper(targetID)) return;
 
     try {
-      const result = await new Promise((resolve, reject) => {
-        api.gcmember("remove", targetID, threadID, (err, data) => {
-          if (err) reject(err);
-          else resolve(data);
-        });
-      });
+      const result = await api.gcmember("remove", targetID, threadID);
       if (result && result.type === "error_gc") {
-        errMsg = result.error;
-      } else {
-        success = true;
+        logger.warn(`تعذر طرد عضو من القروب ${threadID}: ${result.error}`);
       }
     } catch (e) {
-      errMsg = e.message || "خطأ غير معروف";
+      logger.warn(`تعذر طرد عضو من القروب ${threadID}: ${e?.message || e}`);
     }
-
-    if (!success) {
-      return api.sendMessage(`❌ فشل الطرد: ${errMsg}`, threadID);
-    }
-
-    // إرسال الفيديو إذا كان موجوداً
-    if (fs.existsSync(VIDEO_PATH)) {
-      try {
-        await api.sendMessage(
-          { body: `✅ تم طرد ${targetID} من القروب! 👋🚪`, attachment: fs.createReadStream(VIDEO_PATH) },
-          threadID
-        );
-        return;
-      } catch {}
-    }
-
-    await api.sendMessage(`✅ تم طرد ${targetID} من القروب! 👋🚪`, threadID);
   },
 };

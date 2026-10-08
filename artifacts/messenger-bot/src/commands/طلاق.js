@@ -1,5 +1,6 @@
 const { downloadImage } = require("../utils/images");
 const fs = require("fs");
+const { createMentionedAction } = require("../utils/mentionStyle");
 
 const TAGS = ["sad,crying,alone", "heartbreak,sadness", "crying,tears,emotion", "breakup,lonely,sad"];
 
@@ -21,22 +22,22 @@ module.exports = {
       return api.sendMessage("❌ رُدّ على رسالة الشخص الذي تريد تطليقه!", threadID);
 
     const target = String(messageReply.senderID);
-    const body   = `💔 ${senderID} طلّق ${target}! آسفين على السماع 😢`;
+    const message = createMentionedAction("divorce", senderID, target);
 
-    await sendWithImage(api, threadID, body, TAGS);
+    await sendWithImage(api, threadID, message, TAGS);
   },
 };
 
-async function sendWithImage(api, threadID, body, tags) {
+async function sendWithImage(api, threadID, message, tags) {
   for (let i = 0; i < tags.length; i++) {
     const url = `https://loremflickr.com/600/600/${tags[i]}?lock=${Math.floor(Math.random() * 999) + 1}`;
     const tmp = await downloadImage(url);
     if (!tmp) continue;
     try {
-      await api.sendMessage({ body, attachment: fs.createReadStream(tmp) }, threadID);
+      await api.sendMessage({ ...message, attachment: fs.createReadStream(tmp) }, threadID);
       return;
     } catch {}
     finally { fs.unlink(tmp, () => {}); }
   }
-  await api.sendMessage(body, threadID);
+  await api.sendMessage(message, threadID);
 }

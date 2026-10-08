@@ -2,6 +2,9 @@ const { login } = require("ws3-fca");
 const fs   = require("fs");
 const path = require("path");
 const config  = require("../config.json");
+const { applySavedPrefixes } = require("./utils/prefixes");
+const { installTypingBehavior } = require("./utils/typingBehavior");
+applySavedPrefixes(config);
 const handler = require("./handler");
 const logger  = require("./utils/logger");
 const state   = require("./state");
@@ -115,6 +118,7 @@ function formatLoginError(err) {
 }
 
 function sendGroupEventImage(api, threadID, filename, slot) {
+  if (!state.isGroupEventImagesEnabled(threadID)) return;
   const configuredPath = slot ? groupEventImages.getImagePath(threadID, slot) : null;
   const imagePath = configuredPath || path.join(groupEventImageDir, filename);
   if (!fs.existsSync(imagePath)) {
@@ -230,6 +234,7 @@ function startBot(api) {
     logLevel:     "silent",
     autoReconnect: false,
   });
+  installTypingBehavior(api, 5000, 7000);
 
   const botID = api.getCurrentUserID();
   logger.info(`✅ تسجيل الدخول نجح | ID: ${botID}`);

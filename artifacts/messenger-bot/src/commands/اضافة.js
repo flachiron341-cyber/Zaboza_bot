@@ -1,4 +1,5 @@
 const { parseFacebookUserID } = require("../utils/facebookUserId");
+const logger = require("../utils/logger");
 
 module.exports = {
   config: {
@@ -18,12 +19,7 @@ module.exports = {
     // معرّف أو رابط Facebook يحتوي على معرّف رقمي.
     if (args.length > 0) {
       targetID = parseFacebookUserID(args.join(" "));
-      if (!targetID) {
-        return api.sendMessage(
-          "❌ اكتب ID أو رابط Facebook يحتوي على ID رقمي.",
-          threadID
-        );
-      }
+    if (!targetID) return;
     }
 
     // حالة 2: رد على رسالة
@@ -31,43 +27,15 @@ module.exports = {
       targetID = String(messageReply.senderID);
     }
 
-    if (!targetID) {
-      return api.sendMessage(
-        "❌ رُدّ على رسالة الشخص أو اكتب رابط حسابه!\nمثال: !اضافة https://www.facebook.com/profile.php?id=...",
-        threadID
-      );
-    }
-
-    await api.sendMessage(`⏳ جاري إضافة ${targetID}...`, threadID);
-
-    let success = false;
-    let errMsg  = "";
+    if (!targetID) return;
 
     try {
-      const result = await new Promise((resolve, reject) => {
-        api.gcmember("add", targetID, threadID, (err, data) => {
-          if (err) reject(err);
-          else resolve(data);
-        });
-      });
+      const result = await api.gcmember("add", targetID, threadID);
       if (result && result.type === "error_gc") {
-        errMsg = result.error;
-      } else {
-        success = true;
+        logger.warn(`تعذرت إضافة عضو إلى القروب ${threadID}: ${result.error}`);
       }
     } catch (e) {
-      errMsg = e.message || "خطأ غير معروف";
+      logger.warn(`تعذرت إضافة عضو إلى القروب ${threadID}: ${e?.message || e}`);
     }
-
-    if (!success) {
-      return api.sendMessage(`❌ فشلت الإضافة: ${errMsg}`, threadID);
-    }
-
-    // صورة الإضافة تُرسل مرة واحدة فقط من log:subscribe في index.js.
-    // إرسالها هنا أيضاً كان سبب ظهورها مرتين بعد نجاح الإضافة.
-    await api.sendMessage(
-      `✅ تمت إضافة ${targetID}.\n🎉 ستصل صورة الترحيب عند تسجيل حدث دخول العضو.`,
-      threadID
-    );
   },
 };

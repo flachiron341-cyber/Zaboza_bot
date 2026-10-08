@@ -3,7 +3,6 @@
  */
 const persistentState = require("./utils/persistentState");
 const savedState = persistentState.readState();
-const autoReplySettings = persistentState.getAutoReply();
 
 const attackDelay = new Map(
   Object.entries(savedState.attackDelays || {}).map(([threadID, delay]) => [
@@ -26,6 +25,12 @@ const nameProtectionState = new Map(
     { active: true, name: String(name || "") },
   ])
 );
+const groupEventImagesEnabled = new Map(
+  Object.entries(savedState.groupEventImagesEnabled || {}).map(([threadID, enabled]) => [
+    String(threadID),
+    Boolean(enabled),
+  ])
+);
 
 module.exports = {
   // جلسات أمر !اسئلة  —  key: messageID, value: { msgID, answer, threadID, timer }
@@ -45,7 +50,7 @@ module.exports = {
 
   // حماية اسم القروب التي يفعّلها أمر !نيم.
   nameProtectionState,
-  autoReplySettings,
+  groupEventImagesEnabled,
 
   // لعبة التخمين: جلسة مستقلة لكل قروب ومستخدم.
   guessGames: new Map(),
@@ -94,10 +99,15 @@ module.exports = {
     persistentState.removeNameProtection(String(threadID));
   },
 
-  saveAutoReply(settings) {
-    this.autoReplySettings.enabled = Boolean(settings.enabled);
-    this.autoReplySettings.response = String(settings.response || "");
-    persistentState.saveAutoReply(this.autoReplySettings);
+  isGroupEventImagesEnabled(threadID) {
+    return this.groupEventImagesEnabled.get(String(threadID)) !== false;
+  },
+
+  setGroupEventImagesEnabled(threadID, enabled) {
+    const id = String(threadID);
+    const value = Boolean(enabled);
+    this.groupEventImagesEnabled.set(id, value);
+    persistentState.saveGroupEventImagesEnabled(id, value);
   },
 
   persistAttackDelay(threadID) {

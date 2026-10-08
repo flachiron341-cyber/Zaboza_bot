@@ -1,3 +1,5 @@
+const { leaveGroup } = require("../utils/leaveGroup");
+
 module.exports = {
   config: {
     name: "مغادرة",
@@ -10,20 +12,10 @@ module.exports = {
 
   async run({ api, event, botID }) {
     const threadID = String(event.threadID);
-    const selfID = String(botID || api.getCurrentUserID());
-    await api.sendMessage(
-      "تهلاو مقدرناش مع لقحااب دزبـبي هذو نكماتهم🤮🖕🏿🤓🍆⛩️",
-      threadID
-    );
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
     try {
-      const result = await api.gcmember("remove", selfID, threadID);
-      if (result?.type === "error_gc") {
-        return api.sendMessage(`❌ تعذر خروج البوت: ${result.error}`, threadID);
-      }
+      await leaveGroup(api, threadID, botID);
     } catch (error) {
-      return api.sendMessage(`❌ تعذر خروج البوت: ${error.message}`, threadID);
+      await api.sendMessage(`❌ تعذر خروج البوت: ${error?.message || error}`, threadID);
     }
   },
 };
