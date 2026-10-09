@@ -234,7 +234,7 @@ function startBot(api) {
     logLevel:     "silent",
     autoReconnect: false,
   });
-  installTypingBehavior(api, 5000, 7000);
+  installTypingBehavior(api, 6000, 7000);
 
   const botID = api.getCurrentUserID();
   logger.info(`✅ تسجيل الدخول نجح | ID: ${botID}`);

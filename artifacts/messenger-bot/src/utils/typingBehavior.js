@@ -3,19 +3,20 @@
 const logger = require("./logger");
 const installedApis = new WeakSet();
 
-async function sendWithTyping(api, threadID, send, minDelayMs = 5000, maxDelayMs = 7000) {
+async function sendWithTyping(api, threadID, send, minDelayMs = 6000, maxDelayMs = 7000) {
   const id = String(threadID || "");
   const sendTyping = typeof api?.sendTypingIndicator === "function"
     ? api.sendTypingIndicator.bind(api)
     : null;
-  if (!id || !sendTyping) return send();
 
   let typingStarted = false;
-  try {
-    await sendTyping(true, id);
-    typingStarted = true;
-  } catch (error) {
-    logger.warn(`تعذر إظهار مؤشر الكتابة في القروب ${id}: ${error?.message || error}`);
+  if (id && sendTyping) {
+    try {
+      await sendTyping(true, id);
+      typingStarted = true;
+    } catch (error) {
+      logger.warn(`تعذر إظهار مؤشر الكتابة في القروب ${id}: ${error?.message || error}`);
+    }
   }
 
   const delay = minDelayMs + Math.floor(Math.random() * (maxDelayMs - minDelayMs + 1));
@@ -34,13 +35,10 @@ async function sendWithTyping(api, threadID, send, minDelayMs = 5000, maxDelayMs
   }
 }
 
-function installTypingBehavior(api, minDelayMs = 5000, maxDelayMs = 7000) {
+function installTypingBehavior(api, minDelayMs = 6000, maxDelayMs = 7000) {
   if (!api || installedApis.has(api) || typeof api.sendMessage !== "function") return;
 
   const sendMessage = api.sendMessage.bind(api);
-  const sendTyping = typeof api.sendTypingIndicator === "function"
-    ? api.sendTypingIndicator.bind(api)
-    : null;
   const pendingByThread = new Map();
 
   api.sendMessage = (...args) => {
@@ -57,7 +55,7 @@ function installTypingBehavior(api, minDelayMs = 5000, maxDelayMs = 7000) {
       maxDelayMs
     );
 
-    if (!threadID || !sendTyping) return send();
+    if (!threadID) return send();
 
     const previous = pendingByThread.get(threadID) || Promise.resolve();
     const operation = previous.catch(() => {}).then(send);
