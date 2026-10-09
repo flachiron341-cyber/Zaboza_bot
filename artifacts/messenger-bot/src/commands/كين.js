@@ -40,7 +40,7 @@ module.exports = {
 
     if (currentJob) return;
 
-    const reset = action === "عكس" || action === "reset";
+    const reset = action === "عكس" || action === "حذف" || action === "reset" || action === "delete";
     const nickname = reset ? "" : args.join(" ").trim();
     if (!nickname && !reset) return;
 
@@ -74,7 +74,7 @@ module.exports = {
         }
 
         if (index < participants.length - 1 && !job.cancelled) {
-          const delay = 3000 + Math.floor(Math.random() * 4001);
+          const delay = 3000 + Math.floor(Math.random() * 2001);
           await waitBetweenChanges(job, delay);
         }
       }

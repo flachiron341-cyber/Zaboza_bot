@@ -1,12 +1,12 @@
 const fs = require("fs");
 const logger = require("../utils/logger");
-const { searchFreeAudio, downloadFreeAudio, searchSong, downloadSongPreview } = require("../utils/music");
+const { searchFreeAudio, downloadFreeAudio, searchSong } = require("../utils/music");
 
 module.exports = {
   config: {
     name: "اغنية",
     aliases: ["اغنيه", "song", "music"],
-    description: "يرسل الصوت الكامل إذا كان مرخّصاً للمشاركة، وإلا يعرض معاينة ورابط المصدر",
+    description: "يرسل الصوت الكامل إذا كان مرخّصاً للمشاركة، وإلا يرسل رابط الاستماع",
     usage: "!اغنية [اسم أغنية أو صوت]",
     cooldown: 20,
     adminOnly: false,
@@ -53,22 +53,15 @@ module.exports = {
       const result = await searchSong(query);
       if (!result) {
         return api.sendMessage(
-          "❌ لم أجد ملفاً صوتياً مرخّصاً أو معاينة لهذه العبارة. جرّب وصفاً أبسط، مثل: rain sound.",
+          "❌ لم أجد ملفاً صوتياً كاملاً مرخّصاً أو رابط استماع لهذه العبارة. جرّب وصفاً أبسط.",
           threadID
         );
       }
 
-      audioPath = await downloadSongPreview(result.preview);
-      if (!audioPath) return api.sendMessage("❌ تعذر تحميل المعاينة الصوتية.", threadID);
-
       await api.sendMessage(
-        {
-          body:
-            `🎧 ${result.title} — ${result.artist}\n` +
-            "المرفق معاينة قصيرة من Deezer؛ لا أرسل نسخة كاملة من أغنية محمية بحقوق النشر.\n" +
-            `للاستماع إلى المصدر كاملاً: ${result.link || `https://www.deezer.com/search/${encodeURIComponent(query)}`}`,
-          attachment: fs.createReadStream(audioPath),
-        },
+        `🎧 ${result.title} — ${result.artist}\n` +
+          "لم أجد نسخة كاملة تسمح رخصتها بإرسالها كملف؛ هذا رابط الاستماع إلى المصدر:\n" +
+          `${result.link || `https://www.deezer.com/search/${encodeURIComponent(query)}`}`,
         threadID
       );
     } catch (error) {
