@@ -1,4 +1,5 @@
 appstate.json
 cookies.txt
 data/usage.json
+data/dashboard-*
 src/data/bot-state.json

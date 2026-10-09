@@ -3,7 +3,7 @@
 const logger = require("./logger");
 const installedApis = new WeakSet();
 
-async function sendWithTyping(api, threadID, send, minDelayMs = 8000, maxDelayMs = 10000) {
+async function sendWithTyping(api, threadID, send, minDelayMs = 3000, maxDelayMs = 3000) {
   const id = String(threadID || "");
   const sendTyping = typeof api?.sendTypingIndicator === "function"
     ? api.sendTypingIndicator.bind(api)
@@ -35,7 +35,7 @@ async function sendWithTyping(api, threadID, send, minDelayMs = 8000, maxDelayMs
   }
 }
 
-function installTypingBehavior(api, minDelayMs = 8000, maxDelayMs = 10000) {
+function installTypingBehavior(api, minDelayMs = 3000, maxDelayMs = 3000) {
   if (!api || installedApis.has(api) || typeof api.sendMessage !== "function") return;
 
   const sendMessage = api.sendMessage.bind(api);

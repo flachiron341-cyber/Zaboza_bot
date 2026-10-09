@@ -32,11 +32,6 @@ ws3-fca أحياناً يُعيد IDs كـ String objects (ليس primitive stri
 ## Google TTS
 `https://translate.google.com/translate_tts?ie=UTF-8&q={text}&tl=ar&client=tw-ob` يعمل بـ arraybuffer ويعيد audio/mpeg صحيح (13KB+).
 
-## appstate.json
-يجب أن يكون في .gitignore — يحتوي كوكيز جلسة فيسبوك.
-ملف الجلسة في هذا المشروع للقراءة فقط؛ لا تحفظ نسخة `api.getAppState()` تلقائياً ولا تعدّل الملف عند التشغيل.
-مصدر التشغيل اليدوي هو `manual-appstate.json`، وتحديثه يتم فقط عبر مثبت الكوكيز؛ إعادة المحاولة تعيد تحميله حتى لا تُستخدم نسخة عدّلتها المكتبة في الذاكرة.
-
 ## انتهاء صلاحية الكوكيز
 قد يعيد `ws3-fca` الخطأ `Error retrieving userID` عند انتهاء الجلسة أو رفضها مؤقتاً. يجب أن يبقى process شغالاً، وأن تعيد كل محاولة قراءة `appstate.json` من القرص دون طباعة محتوى الكوكيز.
 

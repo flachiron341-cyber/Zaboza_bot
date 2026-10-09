@@ -1,6 +1,13 @@
 const { login } = require("ws3-fca");
 const fs   = require("fs");
 const path = require("path");
+const { randomUUID } = require("node:crypto");
+const {
+  getPaths,
+  readEncryptedAppState,
+  readJsonFile,
+  writeJsonAtomic,
+} = require("@workspace/bot-control");
 const config  = require("../config.json");
 const { applySavedPrefixes } = require("./utils/prefixes");
 const { installTypingBehavior } = require("./utils/typingBehavior");
@@ -15,6 +22,7 @@ const groupEventImages = require("./utils/groupEventImages");
 const appstateSecretName = "FACEBOOK_APPSTATE";
 const appstatePath = path.join(__dirname, "../appstate.json");
 const cookiesTxtPath = path.join(__dirname, "../cookies.txt");
+const dashboardPaths = getPaths(__dirname);
 const groupEventImageDir = path.join(__dirname, "../assets/events");
 const groupEventDedupe = new Map();
 const nameRestoreInFlight = new Set();
@@ -45,6 +53,24 @@ function parseAppStateSecret(rawValue) {
 }
 
 function loadAppState() {
+  // جلسات لوحة التحكم تُحفظ مشفرة وتعلو على أي مصدر قديم.
+  if (fs.existsSync(dashboardPaths.appStateFile)) {
+    try {
+      const encryptedAppState = readEncryptedAppState(
+        dashboardPaths.appStateFile,
+        process.env.SESSION_SECRET,
+      );
+      if (isUsableAppState(encryptedAppState)) {
+        logger.info("🍪 قُرئت جلسة Messenger المشفرة من لوحة التحكم");
+        return encryptedAppState;
+      }
+      logger.error("⚠️ جلسة لوحة التحكم غير صالحة.");
+    } catch {
+      logger.error("⚠️ تعذر فك تشفير جلسة لوحة التحكم؛ لم تُستخدم أي جلسة احتياطية.");
+    }
+    return null;
+  }
+
   // ── المصدر الأساسي: ملف يدوي يمكن تبديله بسهولة بين الحسابات ──
   if (fs.existsSync(appstatePath)) {
     try {
@@ -103,6 +129,144 @@ const MAX_RETRY_DELAY_MS = 30000;
 let retryTimer = null;
 let loginInProgress = false;
 let activeAPI = null;
+let activeListener = null;
+let lifecycleGeneration = 0;
+let currentBotStatus = "unknown";
+let controlPollTimer = null;
+let heartbeatTimer = null;
+
+function readDashboardControl() {
+  try {
+    const control = readJsonFile(dashboardPaths.controlFile, {});
+    return {
+      ...control,
+      desiredState: control.desiredState === "stopped" ? "stopped" : "running",
+      autoReconnect: control.autoReconnect !== false,
+    };
+  } catch {
+    logger.warn("تعذرت قراءة إعدادات تشغيل اللوحة؛ سيُستخدم آخر وضع محفوظ.");
+    return null;
+  }
+}
+
+const initialDashboardControl = readDashboardControl() || {
+  desiredState: "running",
+  autoReconnect: true,
+};
+let desiredRunning = initialDashboardControl.desiredState !== "stopped";
+let autoReconnectEnabled = initialDashboardControl.autoReconnect !== false;
+let lastControlCommandId = initialDashboardControl.commandId || null;
+
+function writeDashboardStatus() {
+  try {
+    writeJsonAtomic(dashboardPaths.statusFile, {
+      status: currentBotStatus,
+      autoReconnect: autoReconnectEnabled,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch {
+    logger.warn("تعذر تحديث حالة البوت في لوحة التحكم.");
+  }
+}
+
+function addDashboardEvent(level, message) {
+  try {
+    const saved = readJsonFile(dashboardPaths.eventsFile, []);
+    const events = Array.isArray(saved) ? saved : [];
+    events.push({
+      id: randomUUID(),
+      timestamp: new Date().toISOString(),
+      level,
+      message,
+    });
+    writeJsonAtomic(dashboardPaths.eventsFile, events.slice(-40));
+  } catch {
+    logger.warn("تعذر تسجيل حدث لوحة التحكم.");
+  }
+}
+
+function setBotStatus(status, eventMessage = null, level = "info") {
+  const changed = currentBotStatus !== status;
+  currentBotStatus = status;
+  if (changed && eventMessage) addDashboardEvent(level, eventMessage);
+  writeDashboardStatus();
+}
+
+function stopActiveListener() {
+  const listener = activeListener;
+  activeListener = null;
+  activeAPI = null;
+  if (listener && typeof listener.stop === "function") {
+    try {
+      listener.stop();
+    } catch {
+      logger.warn("تعذر إغلاق اتصال Messenger السابق.");
+    }
+  }
+}
+
+function pauseBot() {
+  desiredRunning = false;
+  lifecycleGeneration += 1;
+  if (retryTimer) {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  }
+  stopActiveListener();
+  setBotStatus("stopped", "أوقف المدير البوت من لوحة التحكم.", "warn");
+}
+
+function restartBot(eventMessage) {
+  lifecycleGeneration += 1;
+  if (retryTimer) {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  }
+  stopActiveListener();
+  if (eventMessage) addDashboardEvent("info", eventMessage);
+  if (!desiredRunning) {
+    setBotStatus("stopped");
+    return;
+  }
+  setBotStatus("connecting");
+  if (!loginInProgress) startLogin(1);
+}
+
+function applyDashboardControl() {
+  const control = readDashboardControl();
+  if (!control) return;
+  const wasAutoReconnectEnabled = autoReconnectEnabled;
+  autoReconnectEnabled = control.autoReconnect;
+  if (wasAutoReconnectEnabled && !autoReconnectEnabled && retryTimer) {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+    setBotStatus("error", "عُطّلت إعادة الاتصال التلقائية.", "warn");
+  }
+  const commandChanged =
+    Boolean(control.commandId) && control.commandId !== lastControlCommandId;
+  if (commandChanged) lastControlCommandId = control.commandId;
+
+  if (control.desiredState === "stopped") {
+    if (desiredRunning || activeAPI || retryTimer) pauseBot();
+    else setBotStatus("stopped");
+    return;
+  }
+
+  if (!desiredRunning) {
+    desiredRunning = true;
+    restartBot("أعاد المدير تشغيل البوت من لوحة التحكم.");
+    return;
+  }
+
+  if (commandChanged && control.action === "save_and_run") {
+    restartBot("تم تحديث جلسة Messenger من لوحة التحكم.");
+    return;
+  }
+
+  if (desiredRunning && !activeAPI && !loginInProgress && !retryTimer) {
+    startLogin(1);
+  }
+}
 
 function formatLoginError(err) {
   if (!err) return "سبب غير معروف";
@@ -165,9 +329,18 @@ function shouldHandleGroupEvent(event) {
 }
 
 function scheduleLogin(attempt = 1, overrideDelay = null) {
+  if (!desiredRunning || !autoReconnectEnabled) {
+    setBotStatus(
+      desiredRunning ? "error" : "stopped",
+      desiredRunning ? "تعذر الاتصال؛ أُوقفت إعادة المحاولة تلقائياً." : null,
+      "error",
+    );
+    return;
+  }
   if (retryTimer || loginInProgress) return;
   const delay = overrideDelay ?? Math.min(RETRY_BASE_MS * attempt, MAX_RETRY_DELAY_MS);
   logger.info(`🔄 إعادة المحاولة بعد ${Math.ceil(delay / 1000)}ث...`);
+  setBotStatus("connecting");
   retryTimer = setTimeout(() => {
     retryTimer = null;
     startLogin(attempt);
@@ -175,14 +348,16 @@ function scheduleLogin(attempt = 1, overrideDelay = null) {
 }
 
 function startLogin(attempt = 1) {
-  if (loginInProgress) return;
+  if (!desiredRunning || loginInProgress) return;
   loginInProgress = true;
+  const generation = lifecycleGeneration;
 
   // نعيد قراءة الملف اليدوي في كل محاولة حتى لا تستخدم المكتبة نسخة
   // قد تكون عدّلتها أثناء محاولة سابقة.
   const appstate = loadAppState();
   if (!appstate) {
     loginInProgress = false;
+    setBotStatus("error", "لا توجد جلسة Messenger صالحة للتشغيل.", "error");
     logger.error(
       `❌ لا يوجد كوكيز صالح في appstate.json أو ${appstateSecretName}.\n` +
       "   ضع تصدير المتصفح في cookies.txt ثم شغّل مثبت الكوكيز."
@@ -204,28 +379,38 @@ function startLogin(attempt = 1) {
       },
       (err, api) => {
         loginInProgress = false;
+        if (generation !== lifecycleGeneration || !desiredRunning) {
+          if (!desiredRunning) setBotStatus("stopped");
+          else if (!retryTimer && !activeAPI) startLogin(1);
+          return;
+        }
         if (err) {
+          setBotStatus("error", "فشل تسجيل الدخول؛ تحقق من صلاحية جلسة Messenger.", "error");
           logger.error(`❌ فشل تسجيل الدخول: ${formatLoginError(err)}`);
           scheduleLogin(attempt + 1);
           return;
         }
-        try {
-          startBot(api);
-        } catch (startError) {
+        startBot(api).catch((startError) => {
           activeAPI = null;
+          setBotStatus("error", "تعذر بدء الاستماع لرسائل Messenger.", "error");
           logger.error(`❌ تعذر تشغيل البوت بعد تسجيل الدخول: ${formatLoginError(startError)}`);
           scheduleLogin(attempt + 1);
-        }
+        });
       }
     );
   } catch (loginError) {
     loginInProgress = false;
+    setBotStatus("error", "تعذر بدء تسجيل الدخول إلى Messenger.", "error");
     logger.error(`❌ تعذر بدء تسجيل الدخول: ${formatLoginError(loginError)}`);
     scheduleLogin(attempt + 1);
   }
 }
 
-function startBot(api) {
+async function startBot(api) {
+  if (!desiredRunning) {
+    setBotStatus("stopped");
+    return;
+  }
   activeAPI = api;
 
   api.setOptions({
@@ -235,24 +420,28 @@ function startBot(api) {
     autoReconnect: false,
   });
   // أعد تثبيت مؤشر الكتابة والتأخير عند كل تسجيل دخول أو تبديل للجلسة.
-  installTypingBehavior(api, 8000, 10000);
+  installTypingBehavior(api, 3000, 3000);
 
   const botID = api.getCurrentUserID();
   logger.info(`✅ تسجيل الدخول نجح | ID: ${botID}`);
   logger.info(`🤖 ${config.botName} يعمل | البادئة: ${config.prefix}`);
 
   // ===== الاستماع =====
-  api.listenMqtt((err, event) => {
+  const listener = await api.listenMqtt((err, event) => {
     if (err) {
       const msg = err.error || err.message || JSON.stringify(err);
       logger.error("خطأ في الاستماع: " + msg);
       if (api !== activeAPI) return;
       activeAPI = null;
-      logger.info("🔄 انقطع الاتصال — إعادة تسجيل الدخول بعد 5 ثواني...");
-      scheduleLogin(1, 5000);
+      activeListener = null;
+      setBotStatus("error", "انقطع اتصال Messenger.", "warn");
+      if (autoReconnectEnabled) {
+        logger.info("🔄 انقطع الاتصال — إعادة تسجيل الدخول بعد 5 ثواني...");
+        scheduleLogin(1, 5000);
+      }
       return;
     }
-    if (!event) return;
+    if (!event || !desiredRunning || api !== activeAPI) return;
 
     const senderID = String(event.senderID || "");
     if (senderID === String(botID)) return;
@@ -273,6 +462,12 @@ function startBot(api) {
       handleGroupEvent(api, event);
     }
   });
+  if (!desiredRunning || api !== activeAPI) {
+    if (typeof listener?.stop === "function") listener.stop();
+    return;
+  }
+  activeListener = listener;
+  setBotStatus("running", "اكتمل الاتصال ويستمع البوت للرسائل.");
 
   function handleGroupEvent(api, event) {
     const threadID       = String(event.threadID || "");
@@ -336,8 +531,7 @@ function startBot(api) {
   }
 }
 
-// إذا استبدل المستخدم appstate.json أثناء انتظار إعادة الاتصال،
-// ألغِ الانتظار الحالي وجرّب الكوكيز الجديدة مباشرة.
+// عند تحديث الملف اليدوي، أعد الاتصال به ما لم تكن جلسة اللوحة هي المصدر النشط.
 fs.watchFile(appstatePath, { interval: 2000 }, (current, previous) => {
   if (
     current.mtimeMs === previous.mtimeMs &&
@@ -346,17 +540,34 @@ fs.watchFile(appstatePath, { interval: 2000 }, (current, previous) => {
   ) {
     return;
   }
-  if (activeAPI || loginInProgress) return;
-  if (retryTimer) {
-    clearTimeout(retryTimer);
-    retryTimer = null;
-  }
-  logger.info("📄 تم تغيير appstate.json — تجربة الكوكيز الجديدة بعد ثانية...");
-  scheduleLogin(1, 1000);
+  if (fs.existsSync(dashboardPaths.appStateFile) || !desiredRunning) return;
+  logger.info("📄 تم تغيير appstate.json — تجربة الكوكيز الجديدة...");
+  restartBot("تم تحديث ملف جلسة Messenger اليدوي.");
 });
 
+controlPollTimer = setInterval(applyDashboardControl, 1000);
+heartbeatTimer = setInterval(writeDashboardStatus, 10000);
+
 // ===== بدء التشغيل =====
-startLogin();
+if (desiredRunning) {
+  setBotStatus("connecting", "بدأ تشغيل البوت.");
+  startLogin();
+} else {
+  setBotStatus("stopped");
+}
+
+function shutdown() {
+  desiredRunning = false;
+  lifecycleGeneration += 1;
+  if (retryTimer) clearTimeout(retryTimer);
+  if (controlPollTimer) clearInterval(controlPollTimer);
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
+  stopActiveListener();
+  setBotStatus("stopped");
+}
+
+process.once("SIGINT", shutdown);
+process.once("SIGTERM", shutdown);
 
 process.on("uncaughtException",  (err) => logger.error("uncaughtException: " + err.message));
 process.on("unhandledRejection", (r)   => logger.error("unhandledRejection: " + (r?.message || r)));

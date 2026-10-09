@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: bot-dashboard
+    description: Private Messenger bot dashboard operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,72 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /bot/dashboard:
+    get:
+      operationId: getBotDashboard
+      tags: [bot-dashboard]
+      summary: Get bot status, settings, and recent activity
+      responses:
+        "200":
+          description: Dashboard state without session-cookie contents
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BotDashboard"
+  /bot/session:
+    post:
+      operationId: saveBotSession
+      tags: [bot-dashboard]
+      summary: Securely save Messenger cookies and start the bot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BotSessionInput"
+      responses:
+        "202":
+          description: Session saved and start requested
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BotControlReceipt"
+  /bot/control:
+    post:
+      operationId: controlBot
+      tags: [bot-dashboard]
+      summary: Start or stop the Messenger bot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BotControlInput"
+      responses:
+        "202":
+          description: Control request accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BotControlReceipt"
+  /bot/settings:
+    put:
+      operationId: updateBotSettings
+      tags: [bot-dashboard]
+      summary: Update bot reconnection settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BotSettingsInput"
+      responses:
+        "200":
+          description: Updated dashboard state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BotDashboard"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +101,88 @@ components:
           type: string
       required:
         - status
+    BotEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        level:
+          type: string
+          enum: [info, warn, error]
+        message:
+          type: string
+      required: [id, timestamp, level, message]
+    BotDashboard:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [running, connecting, stopped, error, unknown]
+        sessionConfigured:
+          type: boolean
+        messageDelaySeconds:
+          type: integer
+          enum: [3]
+        typingIndicator:
+          type: boolean
+        autoReconnect:
+          type: boolean
+        updatedAt:
+          type: [string, "null"]
+          format: date-time
+        recentEvents:
+          type: array
+          items:
+            $ref: "#/components/schemas/BotEvent"
+      required:
+        - status
+        - sessionConfigured
+        - messageDelaySeconds
+        - typingIndicator
+        - autoReconnect
+        - updatedAt
+        - recentEvents
+    AppStateCookie:
+      type: object
+      additionalProperties: true
+      properties:
+        key:
+          type: string
+        name:
+          type: string
+        value:
+          type: string
+    BotSessionInput:
+      type: object
+      properties:
+        appState:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/AppStateCookie"
+      required: [appState]
+    BotControlInput:
+      type: object
+      properties:
+        action:
+          type: string
+          enum: [start, stop]
+      required: [action]
+    BotSettingsInput:
+      type: object
+      properties:
+        autoReconnect:
+          type: boolean
+      required: [autoReconnect]
+    BotControlReceipt:
+      type: object
+      properties:
+        accepted:
+          type: boolean
+        message:
+          type: string
+      required: [accepted, message]
 
