@@ -15,7 +15,7 @@ description: بوت فيسبوك مسنجر عربي — هيكله وقرارا
 - `src/utils/translate.js` — قاموس عربي→إنجليزي لـ loremflickr
 
 ## config.json
-- `adminUIDs`: ["61594304253023"] — ID المطور
+- `adminUIDs`: ["61596012961927"] — ID المطور
 - `prefix`: "!"
 
 ## مشكلة appstate منتهية الصلاحية

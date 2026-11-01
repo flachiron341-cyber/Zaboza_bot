@@ -1,41 +1,37 @@
-const { searchWeb } = require("../utils/publicApis");
-const { info, error } = require("../utils/brand");
-
+const on = require("../utils/aiToggle");
 module.exports = {
   config: {
     name: "ذكاء",
-    aliases: ["ai", "مساعد", "اسأل"],
-    description: "بحث معرفي مختصر من مصادر عامة، من دون مفتاح API",
-    usage: "!ذكاء [سؤالك]",
-    cooldown: 8,
+    aliases: ["ai", "gpt"],
+    description: "اسأل الذكاء الاصطناعي Gemini",
+    usage: "!ذكاء on|off|سؤال",
+    cooldown: 5,
     adminOnly: false,
   },
-
   async run({ api, event, args }) {
-    const threadID = String(event.threadID);
-    const question = args.join(" ").trim();
-    if (!question) {
-      return api.sendMessage("❌ اكتب موضوعاً أو سؤالاً للبحث، مثل: !ذكاء ما هو الذكاء الاصطناعي؟", threadID);
-    }
-
+    const tid = String(event.threadID);
+    const a0 = (args[0] || "").toLowerCase();
+    const say = (t) => api.sendMessage(t, tid);
+    if (["on", "شغل"].includes(a0)) { on.set(tid, 1); return say("🟢 تم تشغيل الذكاء الاصطناعي."); }
+    if (["off", "طفي"].includes(a0)) { on.set(tid, 0); return say("🔴 تم إيقاف الذكاء الاصطناعي."); }
+    if (!on.get(tid)) return say("⚪ الذكاء متوقف. اكتب: !ذكاء on");
+    const q = args.join(" ").trim();
+    if (!q) return say("❌ اكتب سؤالك: !ذكاء <سؤال>");
+    const K = process.env.GEMINI_API_KEY;
+    if (!K) return say("❌ مفتاح Gemini غير مضبوط في Secrets.");
     try {
-      const results = await searchWeb(question);
-      if (!results.length) {
-        return api.sendMessage(
-          error("لم أجد نتيجة", ["جرّب كلمات بحث أقصر أو مختلفة. هذا الأمر يعتمد على نتائج الويب ولا يحتاج مفتاح API."]),
-          threadID
-        );
-      }
-      const lines = [
-        `السؤال: ${question}`,
-        "ملخص من نتائج المصادر العامة:",
-        ...results.slice(0, 3).map((item, index) =>
-          `${index + 1}. ${item.title}\n${item.snippet || "لا يتوفر ملخص."}${item.url ? `\n${item.url}` : ""}`
-        ),
-      ];
-      return api.sendMessage(info("مساعد المعرفة", lines).slice(0, 6000), threadID);
-    } catch {
-      return api.sendMessage(error("تعذر البحث", ["تحقق من اتصال البوت بالإنترنت ثم حاول مجدداً."]), threadID);
+      const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=" + K, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: "أجب بالعربية باختصار وود: " + q }] }] }),
+      });
+      const d = await r.json();
+      const t = d?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!t) { console.log("❌ Gemini:", JSON.stringify(d).slice(0, 300)); return say("❌ لم أستلم ردًا."); }
+      say(t);
+    } catch (e) {
+      console.log("❌ خطأ:", String(e?.message || e));
+      say("❌ خطأ في الاتصال بالذكاء الاصطناعي.");
     }
   },
 };

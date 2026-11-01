@@ -1,12 +1,46 @@
 {
-  "prefix": "!",
+  "prefix": "←",
   "botName": "zaboza bot",
   "language": "ar",
-  "adminUIDs": ["61594304253023"],
-  "rootDeveloperID": "61594304253023",
+  "adminUIDs": [
+    "61596012961927"
+  ],
+  "rootDeveloperID": "61596012961927",
   "cooldown": 3,
   "autoReact": true,
   "autoReactEmoji": "👍",
   "logLevel": "info",
-  "listenEvents": true
+  "listenEvents": true,
+  "g1UIDs": [
+    "61596012961927",
+    "61596345860212",
+    "61594212590719"
+  ],
+  "g2UIDs": [],
+  "g1Commands": [
+    "كن",
+    "كين",
+    "نيم",
+    "نيمز",
+    "طرد",
+    "اضافة",
+    "تيك",
+    "تيكتوك",
+    "ادمن",
+    "استحواذ",
+    "صور",
+    "صور_تلقائية"
+  ],
+  "g2Commands": [
+    "صورة",
+    "قول",
+    "اغنية",
+    "معلومات",
+    "احصائيات",
+    "بادئة"
+  ],
+  "prefixes": [
+    "←"
+  ],
+  "g3UIDs": []
 }

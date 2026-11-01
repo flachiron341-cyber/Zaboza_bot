@@ -420,7 +420,7 @@ async function startBot(api) {
     autoReconnect: false,
   });
   // أعد تثبيت مؤشر الكتابة والتأخير عند كل تسجيل دخول أو تبديل للجلسة.
-  installTypingBehavior(api, 3000, 3000);
+  installTypingBehavior(api, 1000, 5000);
 
   const botID = api.getCurrentUserID();
   logger.info(`✅ تسجيل الدخول نجح | ID: ${botID}`);

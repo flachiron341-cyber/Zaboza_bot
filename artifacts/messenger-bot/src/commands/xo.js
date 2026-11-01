@@ -36,7 +36,7 @@ function clearMatch(threadID, match) {
 module.exports = {
   config: {
     name: "xo",
-    aliases: ["اكسو", "tic", "تيك"],
+    aliases: ["اكسو", "tic"],
     description: "لعبة XO بين لاعبين",
     usage: "!xo | !xo انضم (أو !xo للاعب الثاني) | !xo 5 | !xo الغاء",
     cooldown: 0,

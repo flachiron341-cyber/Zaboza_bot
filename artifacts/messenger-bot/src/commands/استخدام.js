@@ -3,57 +3,39 @@ const usageAccess = require("../utils/usageAccess");
 module.exports = {
   config: {
     name: "استخدام",
-    aliases: ["use", "access"],
-    description: "يقفل الاستخدام للمطورين أو يمنح عضواً محدداً صلاحية في القروب",
-    usage: "!استخدام المطور | !استخدام (رد على شخص) | !استخدام سحب (رد)",
+    aliases: ["استعمال", "use"],
+    description: "إدارة صلاحية استخدام البوت في هذا القروب",
+    usage: "!استخدام (رد لمنح) | !استخدام سحب (رد) | !استخدام الكل | !استخدام مطور | !استخدام حالة",
     cooldown: 3,
     adminOnly: true,
   },
-
-  async run({ api, event, args, messageReply, config }) {
+  async run({ api, event, args }) {
     const threadID = String(event.threadID);
-    const choice = String(args[0] || "").toLowerCase();
+    const say = (t) => api.sendMessage(t, threadID);
+    const a0 = String(args[0] || "").trim();
+    const target = String((event.messageReply && event.messageReply.senderID) || args[1] || "").trim();
 
-    if (choice === "المطور" || choice === "developer" || choice === "dev") {
+    if (a0 === "سحب" || a0 === "سحب!") {
+      if (!target) return say("❌ رد على رسالة الشخص الذي تريد سحب صلاحيته.");
+      usageAccess.revokeUser(threadID, target);
+      return say("✅ تم سحب صلاحية الاستخدام من: " + target);
+    }
+    if (a0 === "الكل" || a0 === "all") {
+      usageAccess.setMode(threadID, "all");
+      return say("✅ الوضع الآن: الجميع يستطيعون استخدام البوت في هذا القروب.");
+    }
+    if (a0 === "مطور" || a0 === "dev") {
       usageAccess.setMode(threadID, "developer");
-      return api.sendMessage(
-        "🔒 تم قفل استخدام البوت للمطورين فقط في هذا القروب.",
-        threadID
-      );
+      return say("✅ الوضع الآن: المطور فقط.");
     }
-
-    if (["الجميع", "الكل", "all"].includes(choice)) {
-      return api.sendMessage("🚫 الاستخدام المفتوح للجميع معطّل. امنح الصلاحية لكل شخص بالرد على رسالته.", threadID);
+    if (a0 === "حالة" || a0 === "" || a0 === "status") {
+      return say("📋 حالة القروب: " + usageAccess.describe(threadID));
     }
-
-    if (!messageReply) {
-      return api.sendMessage(
-        "❌ استخدم أحد الخيارات:\n" +
-        "• !استخدام المطور\n" +
-        "• !استخدام (رد على رسالة الشخص لمنحه الصلاحية)\n" +
-        "• !استخدام سحب (رد على رسالة الشخص لإلغاء الصلاحية)",
-        threadID
-      );
+    const grantTarget = String((event.messageReply && event.messageReply.senderID) || a0 || "").trim();
+    if (grantTarget) {
+      usageAccess.grantUser(threadID, grantTarget);
+      return say("✅ تم منح صلاحية الاستخدام لـ: " + grantTarget);
     }
-
-    const targetID = String(messageReply.senderID || "");
-    if (!targetID) {
-      return api.sendMessage("❌ لم أستطع معرفة صاحب الرسالة التي رددت عليها.", threadID);
-    }
-
-    if (choice === "سحب" || choice === "إزالة" || choice === "remove") {
-      const removed = usageAccess.revokeUser(threadID, targetID);
-      return api.sendMessage(
-        removed ? `🔒 أُلغيت صلاحية ${targetID}.` : `ℹ️ لم تكن لدى ${targetID} صلاحية إضافية.`,
-        threadID
-      );
-    }
-
-    usageAccess.grantUser(threadID, targetID);
-    return api.sendMessage(
-      `✅ أصبح العضو ${targetID} مسموحاً له باستخدام البوت في هذا القروب.\n` +
-      `📌 الوضع الحالي: ${usageAccess.describe(threadID)}`,
-      threadID
-    );
+    return say("❌ الصيغ:\n• رد على شخص + !استخدام (لمنحه الصلاحية)\n• رد + !استخدام سحب (لسحبها)\n• !استخدام الكل | !استخدام مطور | !استخدام حالة");
   },
 };
