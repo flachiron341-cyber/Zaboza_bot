@@ -10,7 +10,7 @@
     "fix-cookies": "node scripts/fix-cookies.js"
   },
   "dependencies": {
-    "@workspace/bot-control": "workspace:*",
+    "@workspace/bot-control": "file:../../lib/bot-control",
     "axios": "^1.18.1",
     "chalk": "^4.1.2",
     "dotenv": "^16.0.3",
