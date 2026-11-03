@@ -1,5 +1,4 @@
 node_modules/
-appstate.json
 cookies.txt
 *.tmp
 song_dl.*
