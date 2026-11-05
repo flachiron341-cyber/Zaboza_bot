@@ -8,4 +8,10 @@
 
 export interface BotSettingsInput {
   autoReconnect: boolean;
+  /**
+     * Fixed delay before each outgoing message, while the typing indicator is active
+     * @minimum 0
+     * @maximum 30
+     */
+  messageDelaySeconds?: number;
 }

@@ -26,6 +26,7 @@ type EventLevel = BotDashboard["recentEvents"][number]["level"];
 interface ControlState {
   desiredState: "running" | "stopped";
   autoReconnect: boolean;
+  messageDelaySeconds?: number;
   action?: "start" | "stop" | "save_and_run";
   commandId?: string;
   updatedAt?: string;
@@ -48,7 +49,13 @@ const paths = getPaths(process.cwd());
 const defaultControl: ControlState = {
   desiredState: "running",
   autoReconnect: true,
+  messageDelaySeconds: 3,
 };
+
+function normalizeMessageDelaySeconds(value: unknown): number {
+  const delay = Number(value);
+  return Number.isInteger(delay) && delay >= 0 && delay <= 30 ? delay : 3;
+}
 
 function loadControl(): ControlState {
   try {
@@ -58,6 +65,7 @@ function loadControl(): ControlState {
       ...control,
       desiredState: control.desiredState === "stopped" ? "stopped" : "running",
       autoReconnect: control.autoReconnect !== false,
+      messageDelaySeconds: normalizeMessageDelaySeconds(control.messageDelaySeconds),
     };
   } catch {
     return defaultControl;
@@ -127,7 +135,7 @@ function getDashboardState(): BotDashboard {
   return GetBotDashboardResponse.parse({
     status,
     sessionConfigured: hasConfiguredSession(),
-    messageDelaySeconds: 3,
+    messageDelaySeconds: control.messageDelaySeconds,
     typingIndicator: true,
     autoReconnect: control.autoReconnect,
     updatedAt,
@@ -272,6 +280,9 @@ router.put("/bot/settings", requireDashboardAdmin, (req, res): void => {
   }
   writeControl({
     autoReconnect: parsed.data.autoReconnect,
+    ...(parsed.data.messageDelaySeconds === undefined
+      ? {}
+      : { messageDelaySeconds: parsed.data.messageDelaySeconds }),
     action: "start",
   });
   res.json(UpdateBotSettingsResponse.parse(getDashboardState()));

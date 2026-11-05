@@ -361,7 +361,7 @@ export const getUpdateBotSettingsUrl = () => {
 }
 
 /**
- * @summary Update bot reconnection settings
+ * @summary Update bot reconnection and message-delay settings
  */
 export const updateBotSettings = async (botSettingsInput: BotSettingsInput, options?: RequestInit): Promise<BotDashboard> => {
 
@@ -410,7 +410,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type UpdateBotSettingsMutationError = ErrorType<unknown>
 
     /**
- * @summary Update bot reconnection settings
+ * @summary Update bot reconnection and message-delay settings
  */
 export const useUpdateBotSettings = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBotSettings>>, TError,{data: BodyType<BotSettingsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}

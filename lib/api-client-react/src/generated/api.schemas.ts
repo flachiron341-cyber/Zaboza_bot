@@ -36,17 +36,14 @@ export const BotDashboardStatus = {
   unknown: 'unknown',
 } as const;
 
-export type BotDashboardMessageDelaySeconds = typeof BotDashboardMessageDelaySeconds[keyof typeof BotDashboardMessageDelaySeconds];
-
-
-export const BotDashboardMessageDelaySeconds = {
-  NUMBER_3: 3,
-} as const;
-
 export interface BotDashboard {
   status: BotDashboardStatus;
   sessionConfigured: boolean;
-  messageDelaySeconds: BotDashboardMessageDelaySeconds;
+  /**
+     * @minimum 0
+     * @maximum 30
+     */
+  messageDelaySeconds: number;
   typingIndicator: boolean;
   autoReconnect: boolean;
   /** @nullable */
@@ -80,6 +77,12 @@ export interface BotControlInput {
 
 export interface BotSettingsInput {
   autoReconnect: boolean;
+  /**
+     * Fixed delay before each outgoing message, while the typing indicator is active
+     * @minimum 0
+     * @maximum 30
+     */
+  messageDelaySeconds?: number;
 }
 
 export interface BotControlReceipt {

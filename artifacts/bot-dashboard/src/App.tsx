@@ -184,17 +184,28 @@ function ForbiddenState() {
 }
 
 function isForbidden(error: unknown) {
-  if (!error || typeof error !== 'object') return false;
-  const value = error as { status?: number; statusCode?: number; response?: { status?: number } };
-  return value.status === 403 || value.statusCode === 403 || value.response?.status === 403;
+  return getHttpStatus(error) === 403;
 }
 
-function ErrorPanel({ onRetry, message = 'تعذّر تحميل بيانات البوت الآن.' }: { onRetry: () => void; message?: string }) {
-  return <div className="error-panel"><div className="error-icon"><CircleAlert size={20} /></div><div><strong>لم نتمكن من إكمال الطلب</strong><p>{message}</p></div><button onClick={onRetry} className="retry-button" data-testid="button-retry"><RefreshCw size={15} /> أعد المحاولة</button></div>;
+function getHttpStatus(error: unknown) {
+  if (!error || typeof error !== 'object') return undefined;
+  const value = error as { status?: number; statusCode?: number; response?: { status?: number } };
+  return value.status ?? value.statusCode ?? value.response?.status;
+}
+
+function getDashboardErrorMessage(error: unknown) {
+  const status = getHttpStatus(error);
+  if (status === 401) return 'جلسة الدخول غير صالحة أو انتهت. سجّل الدخول مجدداً للوصول إلى اللوحة.';
+  if (status === 503) return 'إعداد مسؤول اللوحة غير مكتمل أو الخدمة غير متاحة مؤقتاً.';
+  return 'تعذّر تحميل بيانات البوت الآن.';
+}
+
+function ErrorPanel({ onRetry, message = 'تعذّر تحميل بيانات البوت الآن.', signInRequired = false }: { onRetry: () => void; message?: string; signInRequired?: boolean }) {
+  return <div className="error-panel"><div className="error-icon"><CircleAlert size={20} /></div><div><strong>لم نتمكن من إكمال الطلب</strong><p>{message}</p></div><button onClick={onRetry} className="retry-button" data-testid="button-retry"><RefreshCw size={15} /> أعد المحاولة</button>{signInRequired && <Link href="/sign-in" className="button-primary compact error-sign-in" data-testid="link-retry-sign-in">تسجيل الدخول مجدداً</Link>}</div>;
 }
 
 function Dashboard() {
-  const query = useGetBotDashboard({ query: { queryKey: getGetBotDashboardQueryKey(), retry: (count, error) => !isForbidden(error) && count < 1 } });
+  const query = useGetBotDashboard({ query: { queryKey: getGetBotDashboardQueryKey(), retry: (count, error) => !isForbidden(error) && getHttpStatus(error) !== 401 && count < 3, retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000), refetchInterval: 5000, refetchOnWindowFocus: true } });
   const control = useControlBot();
   const saveSession = useSaveBotSession();
   const client = useQueryClient();
@@ -233,7 +244,7 @@ function Dashboard() {
 
   if (query.isLoading) return <Shell active="dashboard"><DashboardSkeleton /></Shell>;
   if (isForbidden(query.error)) return <Shell active="dashboard"><ForbiddenState /></Shell>;
-  if (query.isError || !data) return <Shell active="dashboard"><ErrorPanel onRetry={() => query.refetch()} /></Shell>;
+  if (!data) return <Shell active="dashboard"><ErrorPanel onRetry={() => query.refetch()} message={getDashboardErrorMessage(query.error)} signInRequired={getHttpStatus(query.error) === 401} /></Shell>;
   const status = statusInfo(data.status);
   return <Shell active="dashboard"><div className="dashboard-content">
     <section className="page-heading reveal"><div><div className="eyebrow page-eyebrow"><span className="eyebrow-dot" /> مساحة البوت</div><h1>نظرة عامة</h1><p>حالة الخدمة والجلسة، في مكان واحد.</p></div><div className="updated-label"><span className="font-mono">آخر تحديث</span><strong>{formatDate(data.updatedAt)}</strong></div></section>
@@ -241,10 +252,11 @@ function Dashboard() {
       <div className="status-banner-main"><div className={`status-icon status-${data.status}`}><Bot size={24} strokeWidth={1.7} /></div><div><span className="section-overline font-mono">MESSENGER BOT / STATUS</span><h2>{status.title}</h2><p>{status.description}</p></div></div>
       <div className="status-banner-actions"><span className={`status-pill status-pill-${data.status}`}><i />{status.label}</span>{data.status === 'running' || data.status === 'connecting' ? <button className="button-danger" onClick={() => runControl('stop')} disabled={control.isPending} data-testid="button-stop-bot">{control.isPending ? <LoaderCircle className="spin" size={16} /> : <Square size={14} fill="currentColor" />} إيقاف البوت</button> : <button className="button-primary compact" onClick={() => runControl('start')} disabled={control.isPending || !data.sessionConfigured} title={!data.sessionConfigured ? 'احفظ جلسة Messenger أولاً' : undefined} data-testid="button-start-bot">{control.isPending ? <LoaderCircle className="spin" size={16} /> : <Play size={15} fill="currentColor" />} تشغيل البوت</button>}</div>
     </section>
+    {query.isError && <div className="inline-error" role="status"><CircleAlert size={15} />تعذّر تحديث الحالة؛ نعرض آخر بيانات وصلت بنجاح.<button onClick={() => query.refetch()} aria-label="إعادة المحاولة"><RefreshCw size={14} /></button></div>}
     {controlError && <div className="inline-error" role="alert"><CircleAlert size={15} />{controlError}<button onClick={() => setControlError('')} aria-label="إغلاق"><X size={14} /></button></div>}
     <section className="metrics-row">
       <article className="metric-card"><div className="metric-top"><span>جلسة Messenger</span><span className={`mini-state ${data.sessionConfigured ? 'good' : 'warn'}`}><i />{data.sessionConfigured ? 'مهيّأة' : 'غير مهيّأة'}</span></div><div className="metric-main"><div className="metric-icon sea"><KeyRound size={19} /></div><strong>{data.sessionConfigured ? 'جاهزة' : 'تحتاج إعداداً'}</strong></div><p>{data.sessionConfigured ? 'بيانات الجلسة محفوظة بأمان.' : 'أضف بيانات الجلسة لبدء تشغيل البوت.'}</p></article>
-      <article className="metric-card"><div className="metric-top"><span>تأخير الرسائل</span><span className="metric-tag font-mono">FIXED</span></div><div className="metric-main"><div className="metric-icon gold"><Clock3 size={19} /></div><strong className="metric-latin font-latin">{data.messageDelaySeconds}<small> ثوانٍ</small></strong></div><p>تأخير ثابت قبل إرسال كل رسالة.</p></article>
+      <article className="metric-card"><div className="metric-top"><span>تأخير الرسائل</span><span className="metric-tag font-mono">CONFIG</span></div><div className="metric-main"><div className="metric-icon gold"><Clock3 size={19} /></div><strong className="metric-latin font-latin">{data.messageDelaySeconds}<small> ثوانٍ</small></strong></div><p>مدة الانتظار مع ظهور مؤشر الكتابة.</p></article>
       <article className="metric-card"><div className="metric-top"><span>مؤشر الكتابة</span><span className={`mini-state ${data.typingIndicator ? 'good' : 'off'}`}><i />{data.typingIndicator ? 'مفعّل' : 'متوقف'}</span></div><div className="metric-main"><div className="metric-icon ink"><Activity size={19} /></div><strong>{data.typingIndicator ? 'يظهر للمستخدم' : 'غير ظاهر'}</strong></div><p>سلوك المؤشر مُدار من إعدادات الخدمة.</p></article>
     </section>
     <section className="dashboard-grid">
@@ -272,11 +284,14 @@ function EventRow({ event }: { event: BotEvent }) {
 }
 
 function Settings() {
-  const query = useGetBotDashboard({ query: { queryKey: getGetBotDashboardQueryKey(), retry: (count, error) => !isForbidden(error) && count < 1 } });
+  const query = useGetBotDashboard({ query: { queryKey: getGetBotDashboardQueryKey(), retry: (count, error) => !isForbidden(error) && getHttpStatus(error) !== 401 && count < 3, retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000), refetchInterval: 5000, refetchOnWindowFocus: true } });
   const update = useUpdateBotSettings();
   const client = useQueryClient();
   const [feedback, setFeedback] = useState('');
   const [errorText, setErrorText] = useState('');
+  const [delayInput, setDelayInput] = useState<string | null>(null);
+  const [delayFeedback, setDelayFeedback] = useState('');
+  const [delayError, setDelayError] = useState('');
   const data = query.data as BotDashboard | undefined;
   const changeReconnect = (value: boolean) => {
     setFeedback(''); setErrorText('');
@@ -285,9 +300,29 @@ function Settings() {
       onError: (error) => setErrorText(isForbidden(error) ? 'هذا الحساب غير مصرّح له بتعديل الإعدادات.' : 'تعذّر حفظ التغيير. حاول مجدداً.'),
     });
   };
+  const saveMessageDelay = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setDelayFeedback('');
+    setDelayError('');
+    const rawValue = delayInput ?? String(data?.messageDelaySeconds ?? 3);
+    const delay = Number(rawValue);
+    if (!rawValue.trim() || !Number.isInteger(delay) || delay < 0 || delay > 30) {
+      setDelayError('أدخل مدة صحيحة بين 0 و30 ثانية.');
+      return;
+    }
+    if (!data) return;
+    update.mutate({ data: { autoReconnect: data.autoReconnect, messageDelaySeconds: delay } }, {
+      onSuccess: (next) => {
+        client.setQueryData(getGetBotDashboardQueryKey(), next);
+        setDelayInput(null);
+        setDelayFeedback('تم حفظ مدة التأخير.');
+      },
+      onError: (error) => setDelayError(isForbidden(error) ? 'هذا الحساب غير مصرّح له بتعديل الإعدادات.' : getHttpStatus(error) === 401 ? 'انتهت جلسة الدخول. سجّل الدخول مجدداً.' : 'تعذّر حفظ مدة التأخير. حاول مجدداً.'),
+    });
+  };
   if (query.isLoading) return <Shell active="settings"><DashboardSkeleton /></Shell>;
   if (isForbidden(query.error)) return <Shell active="settings"><ForbiddenState /></Shell>;
-  if (query.isError || !data) return <Shell active="settings"><ErrorPanel onRetry={() => query.refetch()} /></Shell>;
+  if (!data) return <Shell active="settings"><ErrorPanel onRetry={() => query.refetch()} message={getDashboardErrorMessage(query.error)} signInRequired={getHttpStatus(query.error) === 401} /></Shell>;
   return <Shell active="settings"><div className="settings-content">
     <section className="page-heading reveal"><div><div className="eyebrow page-eyebrow"><span className="eyebrow-dot" /> ضبط السلوك</div><h1>الإعدادات</h1><p>تفضيلات الاتصال وسلوك الرسائل.</p></div><div className="settings-heading-icon"><Settings2 size={21} /></div></section>
     <article className="panel settings-panel reveal-delay"><div className="settings-panel-title"><div className="settings-icon"><RefreshCw size={19} /></div><div><span className="section-overline font-mono">CONNECTION POLICY</span><h2>استعادة الاتصال</h2></div></div><p className="settings-lede">حدّد ما إذا كان على البوت محاولة الاتصال مجدداً عند انقطاع جلسة Messenger. هذا الخيار لا يغيّر بيانات الجلسة المحفوظة.</p>
@@ -296,10 +331,13 @@ function Settings() {
       {feedback && <div className="settings-feedback success"><CircleCheck size={14} />{feedback}</div>}
       {errorText && <div className="settings-feedback error"><CircleAlert size={14} />{errorText}<button onClick={() => changeReconnect(!data.autoReconnect)} data-testid="button-retry-setting">أعد المحاولة</button></div>}
     </article>
-    <section className="fixed-behavior"><div className="fixed-behavior-header"><div><span className="section-overline font-mono">SERVICE BEHAVIOR</span><h2>سلوك ثابت للخدمة</h2></div><span className="fixed-label"><LockKeyhole size={12} /> مُدار من الخدمة</span></div>
-      <div className="fixed-row"><div className="fixed-symbol"><Clock3 size={18} /></div><div><strong>تأخير الرسائل</strong><span>فاصل ثابت بين الرسائل الصادرة</span></div><div className="fixed-value font-mono">03 <small>SEC</small></div><span className="fixed-lock"><LockKeyhole size={14} /></span></div>
+    {query.isError && <div className="inline-error" role="status"><CircleAlert size={15} />تعذّر تحديث الحالة؛ نعرض آخر بيانات وصلت بنجاح.<button onClick={() => query.refetch()} aria-label="إعادة المحاولة"><RefreshCw size={14} /></button></div>}
+    <section className="fixed-behavior"><div className="fixed-behavior-header"><div><span className="section-overline font-mono">SERVICE BEHAVIOR</span><h2>سلوك الرسائل</h2></div><span className="fixed-label"><Activity size={12} /> يتحدث تلقائياً</span></div>
+      <div className="delay-setting-row"><div className="fixed-symbol"><Clock3 size={18} /></div><div className="delay-copy"><strong>تأخير الرد أثناء الكتابة</strong><span>من 0 إلى 30 ثانية، ويُطبّق على الرسائل الجديدة.</span></div><form className="delay-form" onSubmit={saveMessageDelay}><label className="sr-only" htmlFor="message-delay-seconds">مدة التأخير بالثواني</label><input id="message-delay-seconds" className="delay-input" type="number" inputMode="numeric" min={0} max={30} step={1} value={delayInput ?? String(data.messageDelaySeconds)} onChange={(event) => { setDelayInput(event.target.value); setDelayError(''); setDelayFeedback(''); }} aria-describedby="message-delay-unit" /><span id="message-delay-unit" className="delay-unit">ثانية</span><button type="submit" className="button-primary compact delay-save-button" disabled={update.isPending}>{update.isPending ? <LoaderCircle className="spin" size={14} /> : <Check size={14} />} حفظ</button></form></div>
+      {delayError && <div className="settings-feedback error" role="alert"><CircleAlert size={14} />{delayError}</div>}
+      {delayFeedback && <div className="settings-feedback success" role="status"><CircleCheck size={14} />{delayFeedback}</div>}
       <div className="fixed-row"><div className="fixed-symbol"><Activity size={18} /></div><div><strong>مؤشر الكتابة</strong><span>يظهر أثناء فترة تأخير الإرسال</span></div><div className={`fixed-state ${data.typingIndicator ? 'enabled' : 'disabled'}`}><i />{data.typingIndicator ? 'مفعّل' : 'غير مفعّل'}</div><span className="fixed-lock"><LockKeyhole size={14} /></span></div>
-      <p className="fixed-footnote"><CircleAlert size={14} /> هذان السلوكان محددان من إعدادات الخدمة ولا يمكن تعديلهما من هذه اللوحة.</p>
+      <p className="delay-footnote"><CircleAlert size={14} /> يبدأ تطبيق المدة الجديدة على الرسائل التالية بعد حفظها.</p>
     </section>
     <div className="settings-security"><div><ShieldCheck size={18} /><strong>خصوصية الوصول</strong></div><p>تخضع تغييرات الإعدادات لقائمة المسؤولين. لا تُرسل أي بيانات جلسة عند تعديل هذا الخيار.</p><span className="font-mono">AUTHORIZATION · SERVER ENFORCED</span></div>
   </div></Shell>;

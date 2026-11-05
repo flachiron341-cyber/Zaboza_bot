@@ -78,7 +78,7 @@ paths:
     put:
       operationId: updateBotSettings
       tags: [bot-dashboard]
-      summary: Update bot reconnection settings
+      summary: Update bot reconnection and message-delay settings
       requestBody:
         required: true
         content:
@@ -125,7 +125,8 @@ components:
           type: boolean
         messageDelaySeconds:
           type: integer
-          enum: [3]
+          minimum: 0
+          maximum: 30
         typingIndicator:
           type: boolean
         autoReconnect:
@@ -176,6 +177,11 @@ components:
       properties:
         autoReconnect:
           type: boolean
+        messageDelaySeconds:
+          type: integer
+          minimum: 0
+          maximum: 30
+          description: Fixed delay before each outgoing message, while the typing indicator is active
       required: [autoReconnect]
     BotControlReceipt:
       type: object

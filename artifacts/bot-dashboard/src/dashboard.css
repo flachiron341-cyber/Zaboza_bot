@@ -258,6 +258,17 @@
 .fixed-state.disabled i { background: #aab0a9; }
 .fixed-state.enabled { color: #4f8160; }
 .fixed-lock { color: #a2aaa1; }
+.delay-setting-row { display: grid; grid-template-columns: 37px minmax(120px, 1fr) auto; gap: 11px; align-items: center; min-height: 71px; padding: 12px 15px; background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-bottom: 0; border-radius: 11px 11px 0 0; }
+.delay-copy strong,.delay-copy span { display: block; }
+.delay-copy strong { font-size: 10px; }
+.delay-copy span { margin-top: 4px; font-size: 8px; color: hsl(var(--muted-foreground)); }
+.delay-form { display: flex; align-items: center; gap: 7px; direction: ltr; }
+.delay-input { width: 68px; height: 35px; padding: 0 8px; border: 1px solid hsl(var(--border)); border-radius: 8px; background: hsl(42 30% 97%); color: hsl(var(--foreground)); text-align: center; font: inherit; }
+.delay-unit { color: hsl(var(--muted-foreground)); font-size: 9px; white-space: nowrap; }
+.delay-save-button { min-height: 35px; gap: 6px; padding: 0 10px; white-space: nowrap; }
+.delay-footnote { display: flex; align-items: center; gap: 7px; margin: 10px 2px 0; color: hsl(var(--muted-foreground)); font-size: 9px; line-height: 1.7; }
+.delay-footnote svg { flex: none; color: #a47c35; }
+.error-sign-in { margin-inline-start: 8px; text-decoration: none; }
 .fixed-footnote { margin: 10px 0 0; display: flex; gap: 7px; align-items: center; color: hsl(var(--muted-foreground)); font-size: 9px; }
 .fixed-footnote svg { color: #9c8250; flex: none; }
 .settings-security { margin-top: 24px; padding: 16px 17px; border-radius: 11px; background: hsl(167 24% 92% / .7); border: 1px solid hsl(167 18% 81%); }
@@ -398,6 +409,11 @@
   .preference-copy span { max-width: 240px; }
   .fixed-row { grid-template-columns: 34px 1fr 69px 15px; gap: 8px; padding: 11px; }
   .fixed-row > div:nth-child(2) span { font-size: 7px; }
+  .delay-setting-row { grid-template-columns: 34px minmax(0, 1fr); gap: 8px; padding: 11px; }
+  .delay-copy span { font-size: 7px; }
+  .delay-form { grid-column: 2; margin-top: 4px; }
+  .delay-input { width: 62px; }
+  .delay-save-button { min-height: 34px; }
   .fixed-footnote { align-items: flex-start; line-height: 1.7; }
   .auth-page { display: flex; flex-direction: column; min-height: 100dvh; }
   .auth-context { display: none; }

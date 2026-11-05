@@ -11,7 +11,6 @@ export * from './botControlInput';
 export * from './botControlInputAction';
 export * from './botControlReceipt';
 export * from './botDashboard';
-export * from './botDashboardMessageDelaySeconds';
 export * from './botDashboardStatus';
 export * from './botEvent';
 export * from './botEventLevel';

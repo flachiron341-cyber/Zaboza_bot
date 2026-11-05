@@ -138,10 +138,13 @@ let heartbeatTimer = null;
 function readDashboardControl() {
   try {
     const control = readJsonFile(dashboardPaths.controlFile, {});
+    const delay = Number(control.messageDelaySeconds);
     return {
       ...control,
       desiredState: control.desiredState === "stopped" ? "stopped" : "running",
       autoReconnect: control.autoReconnect !== false,
+      messageDelaySeconds:
+        Number.isInteger(delay) && delay >= 0 && delay <= 30 ? delay : 3,
     };
   } catch {
     logger.warn("تعذرت قراءة إعدادات تشغيل اللوحة؛ سيُستخدم آخر وضع محفوظ.");
@@ -155,6 +158,7 @@ const initialDashboardControl = readDashboardControl() || {
 };
 let desiredRunning = initialDashboardControl.desiredState !== "stopped";
 let autoReconnectEnabled = initialDashboardControl.autoReconnect !== false;
+let messageDelaySeconds = initialDashboardControl.messageDelaySeconds;
 let lastControlCommandId = initialDashboardControl.commandId || null;
 
 function writeDashboardStatus() {
@@ -237,6 +241,7 @@ function applyDashboardControl() {
   if (!control) return;
   const wasAutoReconnectEnabled = autoReconnectEnabled;
   autoReconnectEnabled = control.autoReconnect;
+  messageDelaySeconds = control.messageDelaySeconds;
   if (wasAutoReconnectEnabled && !autoReconnectEnabled && retryTimer) {
     clearTimeout(retryTimer);
     retryTimer = null;
@@ -420,7 +425,7 @@ async function startBot(api) {
     autoReconnect: false,
   });
   // أعد تثبيت مؤشر الكتابة والتأخير عند كل تسجيل دخول أو تبديل للجلسة.
-  installTypingBehavior(api, 1000, 5000);
+  installTypingBehavior(api, () => messageDelaySeconds * 1000);
 
   const botID = api.getCurrentUserID();
   logger.info(`✅ تسجيل الدخول نجح | ID: ${botID}`);

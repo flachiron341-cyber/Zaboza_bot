@@ -35,11 +35,15 @@ async function sendWithTyping(api, threadID, send, minDelayMs = 3000, maxDelayMs
   }
 }
 
-function installTypingBehavior(api, minDelayMs = 3000, maxDelayMs = 3000) {
+function installTypingBehavior(api, delayProvider = 3000) {
   if (!api || installedApis.has(api) || typeof api.sendMessage !== "function") return;
 
   const sendMessage = api.sendMessage.bind(api);
   const pendingByThread = new Map();
+  const getDelayMs = () => {
+    const value = Number(typeof delayProvider === "function" ? delayProvider() : delayProvider);
+    return Number.isFinite(value) ? Math.min(30000, Math.max(0, Math.round(value))) : 3000;
+  };
 
   api.sendMessage = (...args) => {
     const rawThreadID = args[1];
@@ -51,8 +55,8 @@ function installTypingBehavior(api, minDelayMs = 3000, maxDelayMs = 3000) {
       api,
       threadID,
       () => sendMessage(...args),
-      minDelayMs,
-      maxDelayMs
+      getDelayMs(),
+      getDelayMs()
     );
 
     if (!threadID) return send();

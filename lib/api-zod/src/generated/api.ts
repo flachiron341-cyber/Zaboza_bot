@@ -20,10 +20,15 @@ export const HealthCheckResponse = zod.object({
 /**
  * @summary Get bot status, settings, and recent activity
  */
+export const getBotDashboardResponseMessageDelaySecondsMin = 0;
+export const getBotDashboardResponseMessageDelaySecondsMax = 30;
+
+
+
 export const GetBotDashboardResponse = zod.object({
   "status": zod.enum(['running', 'connecting', 'stopped', 'error', 'unknown']),
   "sessionConfigured": zod.boolean(),
-  "messageDelaySeconds": zod.literal(3),
+  "messageDelaySeconds": zod.number().min(getBotDashboardResponseMessageDelaySecondsMin).max(getBotDashboardResponseMessageDelaySecondsMax),
   "typingIndicator": zod.boolean(),
   "autoReconnect": zod.boolean(),
   "updatedAt": zod.coerce.date().nullable(),
@@ -70,16 +75,27 @@ export const ControlBotResponse = zod.object({
 
 
 /**
- * @summary Update bot reconnection settings
+ * @summary Update bot reconnection and message-delay settings
  */
+export const updateBotSettingsBodyMessageDelaySecondsMin = 0;
+export const updateBotSettingsBodyMessageDelaySecondsMax = 30;
+
+
+
 export const UpdateBotSettingsBody = zod.object({
-  "autoReconnect": zod.boolean()
+  "autoReconnect": zod.boolean(),
+  "messageDelaySeconds": zod.number().min(updateBotSettingsBodyMessageDelaySecondsMin).max(updateBotSettingsBodyMessageDelaySecondsMax).optional().describe('Fixed delay before each outgoing message, while the typing indicator is active')
 })
+
+export const updateBotSettingsResponseMessageDelaySecondsMin = 0;
+export const updateBotSettingsResponseMessageDelaySecondsMax = 30;
+
+
 
 export const UpdateBotSettingsResponse = zod.object({
   "status": zod.enum(['running', 'connecting', 'stopped', 'error', 'unknown']),
   "sessionConfigured": zod.boolean(),
-  "messageDelaySeconds": zod.literal(3),
+  "messageDelaySeconds": zod.number().min(updateBotSettingsResponseMessageDelaySecondsMin).max(updateBotSettingsResponseMessageDelaySecondsMax),
   "typingIndicator": zod.boolean(),
   "autoReconnect": zod.boolean(),
   "updatedAt": zod.coerce.date().nullable(),

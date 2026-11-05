@@ -5,14 +5,17 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { BotDashboardMessageDelaySeconds } from './botDashboardMessageDelaySeconds';
 import type { BotDashboardStatus } from './botDashboardStatus';
 import type { BotEvent } from './botEvent';
 
 export interface BotDashboard {
   status: BotDashboardStatus;
   sessionConfigured: boolean;
-  messageDelaySeconds: BotDashboardMessageDelaySeconds;
+  /**
+     * @minimum 0
+     * @maximum 30
+     */
+  messageDelaySeconds: number;
   typingIndicator: boolean;
   autoReconnect: boolean;
   /** @nullable */
