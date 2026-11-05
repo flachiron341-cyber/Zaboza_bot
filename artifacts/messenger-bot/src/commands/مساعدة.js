@@ -1,5 +1,11 @@
 const fs = require("fs");
 const path = require("path");
+const state = require("../state");
+const {
+  findCommand,
+  isCommandEnabled,
+  normalizeCommandName,
+} = require("../utils/commandManagement");
 
 const menuImagePath = path.join(__dirname, "../../assets/menu.jpg");
 const WIDTH = 34;
@@ -92,6 +98,14 @@ const CATEGORIES = {
         ["رسالة حذف", "حذف رسالة البوت عند الرد عليها"],
     ],
   },
+  الإدارة: {
+    icon: "🛠",
+    items: [
+      ["إيقاف", "إيقاف أمر واحد أو عدة أوامر"],
+      ["تشغيل", "تشغيل أمر واحد أو عدة أوامر"],
+      ["الموقفة", "عرض الأوامر المتوقفة"],
+    ],
+  },
 };
 
 function fit(text) {
@@ -99,14 +113,24 @@ function fit(text) {
   return chars.length > WIDTH ? chars.slice(0, WIDTH - 1).join("") + "…" : chars.join("") + " ".repeat(Math.max(0, WIDTH - chars.length));
 }
 
-function renderCategory(prefix, name, category) {
+function getEnabledItems(category, commands) {
+  return category.items.filter(([name]) => {
+    const command = findCommand(commands, name) || findCommand(commands, name.split(/\s+/)[0]);
+    return command && isCommandEnabled(command, state.disabledCommands);
+  });
+}
+
+function renderCategory(prefix, name, category, commands) {
+  const items = getEnabledItems(category, commands);
+  if (!items.length) return "لا توجد أوامر مفعّلة في هذا المجال حالياً.";
+
   const lines = [
     `╔${"═".repeat(WIDTH + 4)}╗`,
     `║  ${fit(`${category.icon} ${name}`)}  ║`,
     `╠${"═".repeat(WIDTH + 4)}╣`,
   ];
 
-  for (const [command, description] of category.items) {
+  for (const [command, description] of items) {
     lines.push(`║  ${fit(`${prefix}${command}  —  ${description}`)}  ║`);
   }
 
@@ -124,12 +148,12 @@ module.exports = {
     adminOnly: false,
   },
 
-  async run({ api, event, args, config }) {
+  async run({ api, event, args, config, commands }) {
     const threadID = String(event.threadID);
     const prefix = config.prefix;
-    const requested = args.join(" ").trim().toLowerCase();
+    const requested = normalizeCommandName(args.join(" "));
     const categoryName = Object.keys(CATEGORIES).find(
-      (name) => name.toLowerCase() === requested
+      (name) => normalizeCommandName(name) === requested
     );
 
     let text;
@@ -137,15 +161,20 @@ module.exports = {
       text =
         `🤖 ${config.botName}\n` +
         `╰─ قائمة مجال ${categoryName}\n\n` +
-        renderCategory(prefix, categoryName, CATEGORIES[categoryName]);
+        renderCategory(prefix, categoryName, CATEGORIES[categoryName], commands);
     } else if (requested) {
-      text = `❌ المجال غير موجود.\nالمجالات المتاحة: ${Object.keys(CATEGORIES).join("، ")}`;
+      const availableCategories = Object.entries(CATEGORIES)
+        .filter(([, category]) => getEnabledItems(category, commands).length)
+        .map(([name]) => name);
+      text = `❌ المجال غير موجود.\nالمجالات المتاحة: ${availableCategories.join("، ")}`;
     } else {
+      const availableCategories = Object.entries(CATEGORIES)
+        .filter(([, category]) => getEnabledItems(category, commands).length);
       text = [
         `╔${"═".repeat(WIDTH + 4)}╗`,
         `║  ${fit(`🤖 ${config.botName} — المجالات`)}  ║`,
         `╠${"═".repeat(WIDTH + 4)}╣`,
-        ...Object.entries(CATEGORIES).map(
+        ...availableCategories.map(
           ([name, category]) => `║  ${fit(`${category.icon} ${name}  →  !مساعدة ${name}`)}  ║`
         ),
         `╠${"═".repeat(WIDTH + 4)}╣`,

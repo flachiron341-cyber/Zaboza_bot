@@ -10,6 +10,14 @@ module.exports = {
         adminOnly: true,
     },
 
+  onDisable() {
+    for (const session of state.attackState.values()) {
+      session.active = false;
+      if (session.timeout) clearTimeout(session.timeout);
+    }
+    state.attackState.clear();
+  },
+
     async run({ api, event, args }) {
         const threadID = String(event.threadID);
 

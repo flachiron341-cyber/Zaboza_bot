@@ -2,6 +2,7 @@
  * الحالة المشتركة بين الأوامر
  */
 const persistentState = require("./utils/persistentState");
+const { normalizeCommandName } = require("./utils/commandManagement");
 const savedState = persistentState.readState();
 
 const attackDelay = new Map(
@@ -31,6 +32,9 @@ const groupEventImagesEnabled = new Map(
     Boolean(enabled),
   ])
 );
+const disabledCommands = new Set(
+  persistentState.getDisabledCommands().map(normalizeCommandName).filter(Boolean),
+);
 
 module.exports = {
   // جلسات أمر !اسئلة  —  key: messageID, value: { msgID, answer, threadID, timer }
@@ -51,6 +55,7 @@ module.exports = {
   // حماية اسم القروب التي يفعّلها أمر !نيم.
   nameProtectionState,
   groupEventImagesEnabled,
+  disabledCommands,
 
   // لعبة التخمين: جلسة مستقلة لكل قروب ومستخدم.
   guessGames: new Map(),
@@ -123,5 +128,22 @@ module.exports = {
   removeGroupProtection(threadID) {
     this.protectionState.delete(String(threadID));
     persistentState.removeGroupProtection(String(threadID));
+  },
+
+  setCommandsEnabled(commandNames, enabled) {
+    let changed = false;
+    for (const commandName of commandNames) {
+      const name = normalizeCommandName(commandName);
+      if (!name) continue;
+      if (enabled) changed = this.disabledCommands.delete(name) || changed;
+      else if (!this.disabledCommands.has(name)) {
+        this.disabledCommands.add(name);
+        changed = true;
+      }
+    }
+    if (changed) {
+      persistentState.saveDisabledCommands([...this.disabledCommands]);
+    }
+    return changed;
   },
 };

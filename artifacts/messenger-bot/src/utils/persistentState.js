@@ -129,6 +129,17 @@ function saveCommandPrefixSettings(settings) {
   writeState();
 }
 
+function getDisabledCommands() {
+  return Array.isArray(data.disabledCommands)
+    ? data.disabledCommands.map(String)
+    : [];
+}
+
+function saveDisabledCommands(commandNames) {
+  data.disabledCommands = [...new Set((commandNames || []).map(String).filter(Boolean))];
+  writeState();
+}
+
 function getCreatedGroup(key) {
   return getCreatedGroups()[String(key)] || null;
 }
@@ -155,6 +166,8 @@ module.exports = {
   saveGroupEventImagesEnabled,
   getCommandPrefixSettings,
   saveCommandPrefixSettings,
+  getDisabledCommands,
+  saveDisabledCommands,
   getCreatedGroup,
   saveCreatedGroup,
 };

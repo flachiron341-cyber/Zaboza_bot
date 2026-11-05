@@ -7,6 +7,7 @@ const { handleNextMessage } = require("./utils/gameRouter");
 const permissions = require("./utils/permissions");
 const { getPrefixes, parseCommand } = require("./utils/prefixes");
 const { info } = require("./utils/brand");
+const { isCommandEnabled } = require("./utils/commandManagement");
 
 // ===== تحميل الأوامر =====
 const commands = new Map();
@@ -89,7 +90,9 @@ async function handleMessage(api, rawEvent, config, botID) {
 // __atakPreHook: الرد التلقائي يعمل حتى مع غير المدرجين
   try {
     const __ak = commands.get("اتاك");
-    if (__ak && typeof __ak.onMessage === "function") { __ak.onMessage(api, event); }
+    if (__ak && isCommandEnabled(__ak, state.disabledCommands) && typeof __ak.onMessage === "function") {
+      __ak.onMessage(api, event);
+    }
   } catch (e) {}
 
 
@@ -122,7 +125,9 @@ async function handleMessage(api, rawEvent, config, botID) {
       // __atakHook
       try {
         const __atakCmd = commands.get("اتاك");
-        if (__atakCmd && typeof __atakCmd.onMessage === "function") { __atakCmd.onMessage(api, event); }
+        if (__atakCmd && isCommandEnabled(__atakCmd, state.disabledCommands) && typeof __atakCmd.onMessage === "function") {
+          __atakCmd.onMessage(api, event);
+        }
       } catch (e) {}
     } catch (e) {}
     return;
@@ -132,6 +137,9 @@ async function handleMessage(api, rawEvent, config, botID) {
   if (!commands.has(commandName)) return;
 
   const command = commands.get(commandName);
+  if (!isCommandEnabled(command, state.disabledCommands)) {
+    return api.sendMessage("⏸️ هذا الأمر متوقف مؤقتاً.", threadID);
+  }
 
   // صلاحية استخدام البوت حسب إعداد هذا القروب.
   if (command.config.rootOnly && !permissions.isRootDeveloper(senderID)) {
