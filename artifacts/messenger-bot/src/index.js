@@ -15,13 +15,10 @@ applySavedPrefixes(config);
 const handler = require("./handler");
 const logger  = require("./utils/logger");
 const state   = require("./state");
-const { parseCookieString } = require("./utils/parseCookies");
 const groupEventImages = require("./utils/groupEventImages");
 
 // ===== مسارات الملفات =====
-const appstateSecretName = "FACEBOOK_APPSTATE";
 const appstatePath = path.join(__dirname, "../appstate.json");
-const cookiesTxtPath = path.join(__dirname, "../cookies.txt");
 const dashboardPaths = getPaths(__dirname);
 const groupEventImageDir = path.join(__dirname, "../assets/events");
 const groupEventDedupe = new Map();
@@ -32,24 +29,6 @@ function isUsableAppState(data) {
   if (!Array.isArray(data) || data.length === 0) return false;
   const keys = new Set(data.map((cookie) => String(cookie?.key || cookie?.name || "")));
   return keys.has("c_user") && keys.has("xs");
-}
-
-function parseAppStateSecret(rawValue) {
-  const raw = String(rawValue || "").trim();
-  if (!raw) return null;
-
-  try {
-    const parsed = JSON.parse(raw);
-    const appstate = Array.isArray(parsed)
-      ? parsed
-      : parsed?.appState || parsed?.appstate || parsed?.cookies;
-    if (isUsableAppState(appstate)) return appstate;
-  } catch {
-    // السر قد يكون Cookie header بدلاً من JSON.
-  }
-
-  const parsedCookies = parseCookieString(raw);
-  return isUsableAppState(parsedCookies) ? parsedCookies : null;
 }
 
 function loadAppState() {
@@ -82,41 +61,6 @@ function loadAppState() {
       logger.error("⚠️ appstate.json لا يحتوي c_user و xs.");
     } catch (e) {
       logger.error("⚠️ فشل قراءة appstate.json: " + e.message);
-    }
-  }
-
-  // ── الاحتياطي: سر Replit لا يظهر محتواه في السجلات ──
-  const secretValue = process.env[appstateSecretName];
-  if (secretValue) {
-    const secretAppstate = parseAppStateSecret(secretValue);
-    if (secretAppstate) {
-      logger.info(`🍪 قُرئت ${secretAppstate.length} كوكي من سر ${appstateSecretName}`);
-      return secretAppstate;
-    }
-    logger.error(`⚠️ سر ${appstateSecretName} لا يحتوي appstate صالحاً.`);
-  }
-
-  // ── احتياطي إضافي: Cookie header يدوي ──
-  // ── محاولة 2: قراءة cookies.txt (يدوية فقط، بدون أي كتابة) ──
-  if (fs.existsSync(cookiesTxtPath)) {
-    try {
-      const raw = fs.readFileSync(cookiesTxtPath, "utf-8");
-      // احذف التعليقات والأسطر الفارغة
-      const cookieLine = raw
-        .split("\n")
-        .filter((l) => l.trim() && !l.trim().startsWith("#"))
-        .join(";");
-
-      if (cookieLine.trim()) {
-        const parsed = parseCookieString(cookieLine);
-        if (isUsableAppState(parsed)) {
-          logger.info(`🍪 قُرئت ${parsed.length} كوكي من cookies.txt`);
-          // لا نكتب الكوكيز إلى أي ملف؛ ملفات الجلسة تبقى يدوية وثابتة.
-          return parsed;
-        }
-      }
-    } catch (e) {
-      logger.error("⚠️ فشل قراءة cookies.txt: " + e.message);
     }
   }
 
@@ -364,8 +308,7 @@ function startLogin(attempt = 1) {
     loginInProgress = false;
     setBotStatus("error", "لا توجد جلسة Messenger صالحة للتشغيل.", "error");
     logger.error(
-      `❌ لا يوجد كوكيز صالح في appstate.json أو ${appstateSecretName}.\n` +
-      "   ضع تصدير المتصفح في cookies.txt ثم شغّل مثبت الكوكيز."
+      "❌ لا توجد بيانات جلسة محفوظة؛ أدخل الجلسة من لوحة التحكم أو appstate.json."
     );
     scheduleLogin(attempt + 1);
     return;
@@ -567,6 +510,7 @@ function shutdown() {
   if (retryTimer) clearTimeout(retryTimer);
   if (controlPollTimer) clearInterval(controlPollTimer);
   if (heartbeatTimer) clearInterval(heartbeatTimer);
+  fs.unwatchFile(appstatePath);
   stopActiveListener();
   setBotStatus("stopped");
 }

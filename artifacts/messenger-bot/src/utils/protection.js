@@ -36,25 +36,3 @@ async function markRead(api, event) {
 }
 
 module.exports = { humanDelay, isDuplicate, throttle, markRead };
-
-// ===== Session Refresher: تحديث الكوكيز كل 6 ساعات تلقائيًا =====
-let __lastRefresh = 0;
-async function sessionRefresh(api) {
-  const now = Date.now();
-  if (now - __lastRefresh < 6 * 60 * 60 * 1000) return;
-  __lastRefresh = now;
-  try {
-    if (!api.getAppState) return;
-    const appState = api.getAppState();
-    if (!Array.isArray(appState) || appState.length < 3) return;
-    const fs = require("fs");
-    const p = "/home/runner/workspace/artifacts/messenger-bot/appstate.json";
-    const tmp = p + ".tmp";
-    fs.writeFileSync(tmp, JSON.stringify(appState));
-    fs.renameSync(tmp, p);
-    console.log("Session refreshed - الكوكيز محدثة ✅");
-  } catch (e) {
-    console.log("تعذر تحديث الجلسة:", String(e.message || e).slice(0, 120));
-  }
-}
-module.exports.sessionRefresh = sessionRefresh;

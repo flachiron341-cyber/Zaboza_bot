@@ -1,1 +1,6 @@
-{"desiredState":"running","autoReconnect":true,"action":"save_and_run","commandId":"af18c79b-17a7-48f8-bd68-a38fe73f9163","updatedAt":"2026-11-03T23:26:10.642Z"}
+{
+  "desiredState": "stopped",
+  "autoReconnect": true,
+  "messageDelaySeconds": 3,
+  "action": "stop"
+}

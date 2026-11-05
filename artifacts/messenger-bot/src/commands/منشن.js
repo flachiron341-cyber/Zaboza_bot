@@ -1,3 +1,5 @@
+const { getUserNames } = require("../utils/mentionStyle");
+
 module.exports = {
   config: {
     name: "منشن",
@@ -16,7 +18,11 @@ module.exports = {
     if (!participants.length) return;
 
     const intro = args.join(" ").trim() || "تنبيه لأعضاء القروب:";
-    const mentions = participants.map((id, index) => ({ tag: `@عضو${index + 1}`, id }));
+    const names = await getUserNames(api, participants);
+    const mentions = participants.map((id) => ({
+      tag: `@${names[id] || "عضو"}`,
+      id,
+    }));
     const body = `${intro}\n${mentions.map((mention) => mention.tag).join(" ")}`;
     await api.sendMessage({ body, mentions }, threadID);
   },

@@ -165,7 +165,6 @@ async function handleMessage(api, rawEvent, config, botID) {
   state.stats.commandsProcessed++;
   try {
     await protection.markRead(api, event);
-    protection.sessionRefresh(api);
     await protection.humanDelay(api, threadID, 1200, 3500);
       logger.info(`▶ ${senderID} → ${parsed.prefix}${commandName}`);
       await command.run({

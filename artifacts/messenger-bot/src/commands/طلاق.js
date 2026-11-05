@@ -1,6 +1,6 @@
 const { downloadImage } = require("../utils/images");
 const fs = require("fs");
-const { createMentionedAction } = require("../utils/mentionStyle");
+const { createMentionedAction, getUserNames } = require("../utils/mentionStyle");
 
 const TAGS = ["sad,crying,alone", "heartbreak,sadness", "crying,tears,emotion", "breakup,lonely,sad"];
 
@@ -22,7 +22,8 @@ module.exports = {
       return api.sendMessage("❌ رُدّ على رسالة الشخص الذي تريد تطليقه!", threadID);
 
     const target = String(messageReply.senderID);
-    const message = createMentionedAction("divorce", senderID, target);
+    const names = await getUserNames(api, [senderID, target]);
+    const message = createMentionedAction("divorce", senderID, target, names[senderID], names[target]);
 
     await sendWithImage(api, threadID, message, TAGS);
   },

@@ -105,9 +105,7 @@ function loadEvents(): StoredBotEvent[] {
 function hasConfiguredSession(): boolean {
   return (
     existsSync(paths.appStateFile) ||
-    existsSync(`${paths.root}/artifacts/messenger-bot/appstate.json`) ||
-    existsSync(`${paths.root}/artifacts/messenger-bot/cookies.txt`) ||
-    Boolean(process.env.FACEBOOK_APPSTATE?.trim())
+    existsSync(`${paths.root}/artifacts/messenger-bot/appstate.json`)
   );
 }
 

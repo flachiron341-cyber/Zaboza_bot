@@ -15,12 +15,59 @@ const FRAMES = [
   (icon, text) => `⟡──────── ${icon} ────────⟡\n${text}\n⟡──────────────────⟡`,
 ];
 
-function createMentionedAction(kind, actorID, targetID) {
+function normalizeDisplayName(value, fallback = "عضو") {
+  const name = String(value || "")
+    .replace(/[@\r\n\t]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 48);
+  return name || fallback;
+}
+
+function getUserNames(api, userIDs) {
+  const ids = [...new Set((userIDs || []).map(String).filter(Boolean))];
+  if (!ids.length || typeof api?.getUserInfo !== "function") {
+    return Promise.resolve({});
+  }
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      resolve(value);
+    };
+    const timeout = setTimeout(() => finish({}), 4000);
+
+    try {
+      api.getUserInfo(ids, true, (error, data) => {
+        if (error || !data || typeof data !== "object") {
+          finish({});
+          return;
+        }
+        const names = {};
+        for (const id of ids) {
+          const record = data[id];
+          names[id] = normalizeDisplayName(
+            record?.name || record?.fullName || record?.firstName,
+            "عضو",
+          );
+        }
+        finish(names);
+      });
+    } catch {
+      finish({});
+    }
+  });
+}
+
+function createMentionedAction(kind, actorID, targetID, actorName, targetName) {
   const action = ACTIONS[kind];
   if (!action) throw new Error(`Unknown mention action: ${kind}`);
 
-  const actorTag = "@المبادر";
-  const targetTag = "@العضو";
+  const actorTag = `@${normalizeDisplayName(actorName, "المبادر")}`;
+  const targetTag = `@${normalizeDisplayName(targetName, "العضو")}`;
   const text = action.text(actorTag, targetTag);
   const frame = FRAMES[Math.floor(Math.random() * FRAMES.length)];
   return {
@@ -32,4 +79,4 @@ function createMentionedAction(kind, actorID, targetID) {
   };
 }
 
-module.exports = { createMentionedAction };
+module.exports = { createMentionedAction, getUserNames };

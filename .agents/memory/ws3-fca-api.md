@@ -45,3 +45,10 @@ ws3-fca أحياناً يُعيد IDs كـ String objects (ليس primitive stri
 **Why:** إرسال الصورة من أمر `اضافة` ومن event listener معاً كان يكررها، وإرسالها بعد خروج البوت يسبب خطأ Messenger 1545012.
 
 **How to apply:** خصص صورة دخول البوت عن صورة دخول عضو عادي، واعتمد على `addedParticipants` و`leftParticipantFbId` قبل الإرسال.
+
+## إيقاف مراقبة الملف
+عند الإنهاء المنظم، استدعِ `fs.unwatchFile(appstatePath)` لكل مسار بدأ مراقبته بـ `fs.watchFile`.
+
+**Why:** بقاء مراقب الملف مفتوحاً أبقى عملية البوت تعمل بعد استقبال `SIGTERM`، رغم تنفيذ دالة الإيقاف.
+
+**How to apply:** أزل مراقبات الملفات داخل دالة `shutdown` بجانب إلغاء المؤقتات وإغلاق مستمع Messenger.

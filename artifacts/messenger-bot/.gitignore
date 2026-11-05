@@ -1,5 +1,7 @@
 node_modules/
 cookies.txt
+appstate.json
+data/dashboard-appstate.enc
 *.tmp
 song_dl.*
 .env

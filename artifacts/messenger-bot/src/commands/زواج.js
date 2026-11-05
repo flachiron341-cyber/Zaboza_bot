@@ -1,6 +1,6 @@
 const { downloadImage } = require("../utils/images");
 const fs = require("fs");
-const { createMentionedAction } = require("../utils/mentionStyle");
+const { createMentionedAction, getUserNames } = require("../utils/mentionStyle");
 
 const TAGS = ["wedding,bride,groom", "wedding,ceremony", "bride,flowers,white", "wedding,celebration"];
 
@@ -22,7 +22,8 @@ module.exports = {
       return api.sendMessage("❌ رُدّ على رسالة الشخص الذي تريد الزواج منه!", threadID);
 
     const target = String(messageReply.senderID);
-    const message = createMentionedAction("wedding", senderID, target);
+    const names = await getUserNames(api, [senderID, target]);
+    const message = createMentionedAction("wedding", senderID, target, names[senderID], names[target]);
 
     await sendWithImage(api, threadID, message, TAGS);
   },
