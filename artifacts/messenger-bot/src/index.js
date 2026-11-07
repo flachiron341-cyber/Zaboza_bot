@@ -32,6 +32,20 @@ function isUsableAppState(data) {
 }
 
 function loadAppState() {
+  // ── من متغير البيئة APPSTATE_JSON (مناسب لـ Railway) ──
+  if (process.env.APPSTATE_JSON) {
+    try {
+      const data = JSON.parse(process.env.APPSTATE_JSON);
+      if (isUsableAppState(data)) {
+        logger.info(`🍪 قُرئت ${data.length} كوكي من APPSTATE_JSON`);
+        return data;
+      }
+      logger.error("⚠️ APPSTATE_JSON لا يحتوي c_user و xs.");
+    } catch (e) {
+      logger.error("⚠️ APPSTATE_JSON ليس JSON صالحاً: " + e.message);
+    }
+  }
+
   // جلسات لوحة التحكم تُحفظ مشفرة وتعلو على أي مصدر قديم.
   if (fs.existsSync(dashboardPaths.appStateFile)) {
     try {
