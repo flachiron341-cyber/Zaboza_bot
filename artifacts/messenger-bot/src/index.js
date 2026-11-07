@@ -301,8 +301,6 @@ function startLogin(attempt = 1) {
   loginInProgress = true;
   const generation = lifecycleGeneration;
 
-  // نعيد قراءة الملف اليدوي في كل محاولة حتى لا تستخدم المكتبة نسخة
-  // قد تكون عدّلتها أثناء محاولة سابقة.
   const appstate = loadAppState();
   if (!appstate) {
     loginInProgress = false;
@@ -367,7 +365,6 @@ async function startBot(api) {
     logLevel:     "silent",
     autoReconnect: false,
   });
-  // أعد تثبيت مؤشر الكتابة والتأخير عند كل تسجيل دخول أو تبديل للجلسة.
   installTypingBehavior(api, () => messageDelaySeconds * 1000);
 
   const botID = api.getCurrentUserID();
@@ -429,8 +426,6 @@ async function startBot(api) {
 
     if (logMessageType === "log:unsubscribe") {
       const leftID = participantID(event.logMessageData?.leftParticipantFbId);
-      // عند خروج البوت نفسه لا يمكن إرسال صورة بعد مغادرته، كما أن ذلك
-      // كان سبب خطأ Messenger 1545012 في السجل.
       if (leftID !== String(botID)) {
         sendGroupEventImage(api, threadID, "1788550124005.jpg", "leave");
       }
@@ -475,11 +470,9 @@ async function startBot(api) {
     }
 
     if (!protection || !protection.active) return;
-
   }
 }
 
-// عند تحديث الملف اليدوي، أعد الاتصال به ما لم تكن جلسة اللوحة هي المصدر النشط.
 fs.watchFile(appstatePath, { interval: 2000 }, (current, previous) => {
   if (
     current.mtimeMs === previous.mtimeMs &&
@@ -496,7 +489,6 @@ fs.watchFile(appstatePath, { interval: 2000 }, (current, previous) => {
 controlPollTimer = setInterval(applyDashboardControl, 1000);
 heartbeatTimer = setInterval(writeDashboardStatus, 10000);
 
-// ===== بدء التشغيل =====
 if (desiredRunning) {
   setBotStatus("connecting", "بدأ تشغيل البوت.");
   startLogin();

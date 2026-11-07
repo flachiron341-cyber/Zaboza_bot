@@ -32,7 +32,8 @@ for (const file of commandFiles) {
     logger.error(`خطأ في تحميل ${file}: ${e.message}`);
   }
 }
-logger.info(`✅ إجمالي الأوامر المحملة: ${commandFiles.length}`);
+logger.info(`✅ إجمالي الأوامر المحملة: ${commands.size}`);
+
 
 // ===== تطبيع الحدث =====
 function normalizeEvent(event) {

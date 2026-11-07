@@ -18,11 +18,21 @@ module.exports = {
     if (!participants.length) return;
 
     const intro = args.join(" ").trim() || "تنبيه لأعضاء القروب:";
-    const names = await getUserNames(api, participants);
-    const mentions = participants.map((id) => ({
-      tag: `@${names[id] || "عضو"}`,
-      id,
-    }));
+
+    // تمرير threadInfo حتى تُقرأ الأسماء من بيانات القروب أولاً (إصلاح "عضو عضو عضو")
+    const names = await getUserNames(api, participants, threadInfo);
+
+    // ── إصلاح مهم: منع تكرار نص الوسم نفسه ──
+    // ماسنجر يرفظ ربط الوسوم المكررة بنفس النص، لذلك نجعل كل وسم فريداً.
+    const usedCounts = new Map();
+    const mentions = participants.map((id, index) => {
+      const base = names[id] || `عضو${index + 1}`;
+      const count = usedCounts.get(base) || 0;
+      usedCounts.set(base, count + 1);
+      const tag = count === 0 ? `@${base}` : `@${base}${count + 1}`;
+      return { tag, id };
+    });
+
     const body = `${intro}\n${mentions.map((mention) => mention.tag).join(" ")}`;
     await api.sendMessage({ body, mentions }, threadID);
   },
